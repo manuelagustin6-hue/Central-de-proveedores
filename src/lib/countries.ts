@@ -1,25 +1,33 @@
 export type Country = 'AR' | 'UY' | 'US';
 
-export const COUNTRIES: Record<Country, { name: string; taxIdLabel: string; currency: string; docs: string[] }> = {
-  AR: {
-    name: 'Argentina',
-    taxIdLabel: 'CUIT',
-    currency: 'ARS',
-    docs: ['Formulario de alta', 'Constancia de inscripción AFIP', 'Constancia de CBU'],
-  },
-  UY: {
-    name: 'Uruguay',
-    taxIdLabel: 'RUT',
-    currency: 'UYU',
-    docs: ['Formulario de alta', 'Constancia de inscripción DGI', 'Certificado bancario'],
-  },
-  US: {
-    name: 'Estados Unidos',
-    taxIdLabel: 'EIN',
-    currency: 'USD',
-    docs: ['Formulario de alta', 'W-9'],
-  },
+export const COUNTRIES: Record<Country, { name: string; taxIdLabel: string; currency: string }> = {
+  AR: { name: 'Argentina', taxIdLabel: 'CUIT', currency: 'ARS' },
+  UY: { name: 'Uruguay', taxIdLabel: 'RUT', currency: 'UYU' },
+  US: { name: 'Estados Unidos', taxIdLabel: 'EIN', currency: 'USD' },
 };
+
+// Documentos obligatorios por país. El formulario de alta no es un documento:
+// son los datos que el proveedor completa directamente en el portal.
+export const REQUIRED_DOCS: Record<Country, { type: string; label: string }[]> = {
+  AR: [
+    { type: 'FISCAL', label: 'Constancia de inscripción AFIP' },
+    { type: 'BANCARIO', label: 'Constancia de CBU' },
+  ],
+  UY: [
+    { type: 'FISCAL', label: 'Constancia de inscripción DGI' },
+    { type: 'BANCARIO', label: 'Certificado bancario' },
+  ],
+  US: [{ type: 'W9', label: 'Formulario W-9' }],
+};
+
+/** Tipos de documento obligatorios que aún no fueron subidos. */
+export function missingRequiredDocs(
+  country: string,
+  documents: { type: string }[],
+): { type: string; label: string }[] {
+  const uploaded = new Set(documents.map((d) => d.type));
+  return (REQUIRED_DOCS[country as Country] ?? []).filter((d) => !uploaded.has(d.type));
+}
 
 export function countryName(code: string): string {
   return COUNTRIES[code as Country]?.name ?? code;

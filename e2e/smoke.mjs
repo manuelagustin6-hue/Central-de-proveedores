@@ -56,6 +56,7 @@ await pp.fill('input[name=taxId]', '30-71234567-8');
 await pp.fill('input[name=domicilio]', 'Av. Siempreviva 123, CABA');
 await pp.fill('input[name=website]', 'https://proveedortest.com');
 await pp.fill('input[name=email]', 'pagos@proveedortest.com');
+await pp.fill('input[name=contactName]', 'Juan Pérez');
 await pp.fill('input[name=phoneProvided]', '+54 11 4444-5555');
 await act(pp, 'form >> nth=0 >> button[type=submit]');
 check('Proveedor guarda datos', (await pp.content()).includes('Datos guardados'));
@@ -80,8 +81,26 @@ await pp.fill('input[name=cbu]', '2850590940090418135201');
 }
 check('Proveedor carga datos bancarios', (await pp.content()).includes('Datos bancarios guardados'));
 
-// 3. Validación telefónica: mismo teléfono del proveedor → bloqueado
+// 3a. Validación bloqueada mientras falten documentos obligatorios
 const val = await loginAs('validacion@demo.com');
+await val.page.goto(supplierUrl);
+await val.page.fill('input[name=phoneIndependent]', '+54 11 9999-8888');
+await val.page.fill('input[name=phoneSource]', 'https://proveedortest.com/contacto');
+await act(val.page, 'text=Registrar validación telefónica');
+check('Bloquea validación sin documentos obligatorios', (await val.page.content()).includes('Faltan documentos obligatorios'));
+
+// 3b. El proveedor sube los documentos obligatorios (AR: AFIP + constancia CBU)
+await pp.goto(`${BASE}/portal/${token}`);
+for (const docType of ['FISCAL', 'BANCARIO']) {
+  await pp.goto(`${BASE}/portal/${token}`);
+  await pp.setInputFiles(`#doc-${docType} input[type=file]`, {
+    name: `${docType.toLowerCase()}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 doc'),
+  });
+  await act(pp, `#doc-${docType} button`);
+}
+check('Checklist de documentos completa', (await pp.locator('.badge.ok', { hasText: 'Subido' }).count()) === 2);
+
+// 3c. Validación telefónica: mismo teléfono del proveedor → bloqueado
 await val.page.goto(supplierUrl);
 await val.page.fill('input[name=phoneIndependent]', '+54 11 4444 5555');
 await val.page.fill('input[name=phoneSource]', 'https://proveedortest.com/contacto');
@@ -134,7 +153,7 @@ await pp.selectOption('select[name=kind]', 'FACTURA');
 await pp.fill('input[name=number]', '0001-00001234');
 await pp.fill('input[name=issueDate]', '2026-07-15');
 await pp.fill('input[name=amount]', '2500000');
-await pp.setInputFiles('input[name=file] >> nth=1', {
+await pp.setInputFiles('input[name=file][accept]', {
   name: 'factura.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test'),
 });
 await act(pp, 'text=Enviar comprobante');
@@ -168,7 +187,8 @@ await pp.goto(`${BASE}/portal/${token}`);
 const html = await pp.content();
 check('Proveedor ve factura Pagada', html.includes('Pagada'));
 check('Proveedor puede descargar recibo', html.includes('recibo.pdf'));
-const dl = await pctx.request.get(`${BASE}/api/files/` + html.match(/api\/files\/([a-z0-9]+)\?token=/)?.[1] + `?token=${token}`);
+const reciboHref = await pp.locator('a', { hasText: 'recibo.pdf' }).first().getAttribute('href');
+const dl = await pctx.request.get(`${BASE}${reciboHref}`);
 check('Descarga de recibo desencriptado OK', dl.ok() && (await dl.body()).toString().includes('recibo'));
 
 // 11. Auditoría ve el audit log

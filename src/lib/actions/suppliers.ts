@@ -7,9 +7,10 @@ import { db } from '../db';
 import { requireRole } from '../auth';
 import { audit, assertSegregation } from '../audit';
 import { checkTyposquatting, normalizePhone, raiseRedFlag } from '../bec';
-import { validateTaxId } from '../countries';
+import { missingRequiredDocs, validateTaxId } from '../countries';
 import { encryptFile, MAX_FILE_MSG, MAX_FILE_SIZE } from '../files';
 import { sendNotification } from '../notify';
+import { getBaseUrl } from '../urls';
 
 function backTo(path: string, error?: string, ok?: string): never {
   const q = error ? `?error=${encodeURIComponent(error)}` : ok ? `?ok=${encodeURIComponent(ok)}` : '';
@@ -60,7 +61,7 @@ export async function createSupplier(formData: FormData) {
       await sendNotification(
         email,
         'Alta en portal de proveedores',
-        `Complete sus datos en: ${process.env.APP_URL ?? ''}/portal/${supplier.accessToken}`,
+        `Complete sus datos en: ${getBaseUrl()}/portal/${supplier.accessToken}`,
       );
     }
   } catch (e) {
@@ -84,9 +85,18 @@ export async function registerPhoneValidation(formData: FormData) {
     const source = String(formData.get('phoneSource') ?? '').trim();
     if (!phone || !source) throw new Error('Debe indicar teléfono y fuente independiente');
 
-    const supplier = await db.supplier.findUniqueOrThrow({ where: { id: supplierId } });
+    const supplier = await db.supplier.findUniqueOrThrow({
+      where: { id: supplierId },
+      include: { documents: true },
+    });
     if (supplier.status !== 'DATOS_CARGADOS') {
       throw new Error('El proveedor debe tener los datos y cuenta bancaria cargados antes de la validación telefónica');
+    }
+    const missing = missingRequiredDocs(supplier.country, supplier.documents);
+    if (missing.length > 0) {
+      throw new Error(
+        `Faltan documentos obligatorios del proveedor: ${missing.map((d) => d.label).join(', ')}. No se puede avanzar hasta que los suba.`,
+      );
     }
     await assertSegregation(supplierId, session);
 

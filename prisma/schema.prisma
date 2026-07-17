@@ -34,6 +34,7 @@ model Supplier {
   domicilio   String?
   website     String?
   email       String?
+  contactName String?
   // Teléfono declarado por el proveedor (NO confiable para validación)
   phoneProvided String?
   // Teléfono obtenido por fuente independiente (web oficial / registro público)

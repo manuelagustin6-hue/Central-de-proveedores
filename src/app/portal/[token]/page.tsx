@@ -6,7 +6,13 @@ import {
   updateSupplierData,
   uploadSupplierDocument,
 } from '@/lib/actions/portal';
-import { COUNTRIES, Country, INVOICE_STATUS_LABELS, SUPPLIER_STATUS_LABELS } from '@/lib/countries';
+import {
+  COUNTRIES,
+  Country,
+  INVOICE_STATUS_LABELS,
+  REQUIRED_DOCS,
+  SUPPLIER_STATUS_LABELS,
+} from '@/lib/countries';
 import { Flash, StatusBadge } from '@/components/Alerts';
 
 export const dynamic = 'force-dynamic';
@@ -79,12 +85,16 @@ export default async function PortalPage({
                 <input name="website" defaultValue={supplier.website ?? ''} placeholder="https://..." />
               </label>
               <label>
+                Persona de contacto (nombre y apellido)
+                <input name="contactName" defaultValue={supplier.contactName ?? ''} required />
+              </label>
+              <label>
                 Email de contacto
                 <input type="email" name="email" defaultValue={supplier.email ?? ''} required />
               </label>
               <label>
                 Teléfono de contacto
-                <input name="phoneProvided" defaultValue={supplier.phoneProvided ?? ''} />
+                <input name="phoneProvided" defaultValue={supplier.phoneProvided ?? ''} required />
               </label>
               <button type="submit">Guardar datos</button>
             </form>
@@ -160,42 +170,65 @@ export default async function PortalPage({
 
         <div className="card">
           <h2>3. Documentación obligatoria ({country.name})</h2>
-          <p className="muted">Requeridos: {country.docs.join(' · ')}. Los archivos se almacenan encriptados.</p>
+          <p className="muted">
+            Suba cada documento requerido. Los archivos se almacenan encriptados. Sin la
+            documentación completa no podremos avanzar con la verificación de su alta.
+          </p>
+          <table>
+            <thead>
+              <tr><th>Documento</th><th>Estado</th><th></th></tr>
+            </thead>
+            <tbody>
+              {REQUIRED_DOCS[supplier.country as Country].map((req) => {
+                const uploaded = documents.filter((d) => d.type === req.type);
+                return (
+                  <tr key={req.type} id={`doc-${req.type}`}>
+                    <td><strong>{req.label}</strong></td>
+                    <td>
+                      {uploaded.length > 0 ? (
+                        <span className="badge ok">✓ Subido</span>
+                      ) : (
+                        <span className="badge warn">Pendiente</span>
+                      )}
+                      {uploaded.map((d) => (
+                        <div key={d.id}>
+                          <a href={`/api/files/${d.id}?token=${token}`}>{d.filename}</a>
+                        </div>
+                      ))}
+                    </td>
+                    <td>
+                      <form action={uploadSupplierDocument} className="inline">
+                        <input type="hidden" name="token" value={token} />
+                        <input type="hidden" name="type" value={req.type} />
+                        <input type="file" name="file" required />
+                        <button className="small" type="submit">
+                          {uploaded.length > 0 ? 'Reemplazar' : 'Subir'}
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          <h3>Otros documentos (opcional)</h3>
           <form action={uploadSupplierDocument} className="inline">
             <input type="hidden" name="token" value={token} />
-            <label>
-              Tipo de documento
-              <select name="type">
-                <option value="ALTA">Formulario de alta</option>
-                {supplier.country === 'US' ? (
-                  <option value="W9">W-9</option>
-                ) : (
-                  <option value="FISCAL">Constancia fiscal</option>
-                )}
-                <option value="OTRO">Otro</option>
-              </select>
-            </label>
-            <label>
-              Archivo
-              <input type="file" name="file" required />
-            </label>
-            <button type="submit">Subir</button>
+            <input type="hidden" name="type" value="OTRO" />
+            <input type="file" name="file" required />
+            <button className="small secondary" type="submit">Subir otro documento</button>
           </form>
-          {documents.length > 0 && (
-            <table style={{ marginTop: 12 }}>
-              <thead>
-                <tr><th>Tipo</th><th>Archivo</th><th>Fecha</th></tr>
-              </thead>
-              <tbody>
-                {documents.map((d) => (
-                  <tr key={d.id}>
-                    <td>{d.type}</td>
-                    <td><a href={`/api/files/${d.id}?token=${token}`}>{d.filename}</a></td>
-                    <td>{d.createdAt.toLocaleDateString('es-AR')}</td>
-                  </tr>
+          {documents.filter((d) => d.type === 'OTRO').length > 0 && (
+            <p>
+              {documents
+                .filter((d) => d.type === 'OTRO')
+                .map((d) => (
+                  <span key={d.id} style={{ marginRight: 12 }}>
+                    <a href={`/api/files/${d.id}?token=${token}`}>{d.filename}</a>
+                  </span>
                 ))}
-              </tbody>
-            </table>
+            </p>
           )}
         </div>
 

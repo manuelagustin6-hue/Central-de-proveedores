@@ -11,8 +11,10 @@ import {
   resolveRedFlag,
   uploadInternalDocument,
 } from '@/lib/actions/suppliers';
-import { COUNTRIES, Country, SUPPLIER_STATUS_LABELS, countryName } from '@/lib/countries';
+import { COUNTRIES, Country, REQUIRED_DOCS, SUPPLIER_STATUS_LABELS, countryName } from '@/lib/countries';
+import { getBaseUrl } from '@/lib/urls';
 import { Flash, StatusBadge } from '@/components/Alerts';
+import { CopyButton } from '@/components/CopyButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +52,7 @@ export default async function SupplierDetailPage({
   const activeAccount = supplier.bankAccounts.find((a) => a.active);
   const pendingFlags = supplier.redFlags.filter((f) => !f.resolved);
   const currentIdx = FLOW.indexOf(supplier.status);
-  const portalUrl = `${process.env.APP_URL ?? ''}/portal/${supplier.accessToken}`;
+  const portalUrl = `${getBaseUrl()}/portal/${supplier.accessToken}`;
 
   const can = (r: string) => role === r || role === 'ADMIN';
 
@@ -96,6 +98,7 @@ export default async function SupplierDetailPage({
               <tr><th>{country?.taxIdLabel ?? 'Tax ID'}</th><td>{supplier.taxId ?? '—'}</td></tr>
               <tr><th>Domicilio</th><td>{supplier.domicilio ?? '—'}</td></tr>
               <tr><th>Sitio web</th><td>{supplier.website ?? '—'}</td></tr>
+              <tr><th>Persona de contacto</th><td>{supplier.contactName ?? '—'}</td></tr>
               <tr><th>Email</th><td>{supplier.email ?? '—'}</td></tr>
               <tr><th>Tel. declarado por proveedor</th><td>{supplier.phoneProvided ?? '—'}</td></tr>
               <tr>
@@ -110,6 +113,7 @@ export default async function SupplierDetailPage({
           </table>
           <h3>Enlace único de autogestión</h3>
           <p className="mono">{portalUrl}</p>
+          <CopyButton text={portalUrl} />
           <p className="muted">Envíe este enlace únicamente al contacto verificado del proveedor.</p>
         </div>
 
@@ -276,6 +280,16 @@ export default async function SupplierDetailPage({
 
       <div className="card">
         <h2>Documentación</h2>
+        <p>
+          {REQUIRED_DOCS[supplier.country as Country].map((req) => {
+            const ok = supplier.documents.some((d) => d.type === req.type);
+            return (
+              <span key={req.type} className={`badge ${ok ? 'ok' : 'warn'}`} style={{ marginRight: 8 }}>
+                {ok ? '✓' : '⏳'} {req.label}
+              </span>
+            );
+          })}
+        </p>
         {supplier.documents.length === 0 ? (
           <p className="muted">Sin documentos.</p>
         ) : (
@@ -303,9 +317,9 @@ export default async function SupplierDetailPage({
               <label>
                 Tipo
                 <select name="type">
-                  <option value="FISCAL">Constancia fiscal</option>
-                  <option value="ALTA">Formulario de alta</option>
-                  <option value="W9">W-9</option>
+                  {REQUIRED_DOCS[supplier.country as Country].map((req) => (
+                    <option key={req.type} value={req.type}>{req.label}</option>
+                  ))}
                   <option value="OTRO">Otro</option>
                 </select>
               </label>

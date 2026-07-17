@@ -26,6 +26,7 @@ export async function updateSupplierData(formData: FormData) {
     const website = String(formData.get('website') ?? '').trim();
     const email = String(formData.get('email') ?? '').trim();
     const phoneProvided = String(formData.get('phoneProvided') ?? '').trim();
+    const contactName = String(formData.get('contactName') ?? '').trim();
 
     if (!razonSocial) throw new Error('La razón social es obligatoria');
     if (taxId) {
@@ -41,6 +42,7 @@ export async function updateSupplierData(formData: FormData) {
         domicilio: domicilio || null,
         website: website || null,
         email: email || supplier.email,
+        contactName: contactName || null,
         phoneProvided: phoneProvided || null,
         status: supplier.status === 'PENDIENTE_DATOS' ? 'PENDIENTE_DATOS' : supplier.status,
       },
