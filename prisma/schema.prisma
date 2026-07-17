@@ -1,0 +1,187 @@
+// Central de Proveedores — esquema de datos
+// SQLite en desarrollo; para producción cambiar provider a "postgresql".
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Roles: COMPRAS, VALIDACION, TESORERIA, AUDITORIA, ADMIN
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  auditLogs         AuditLog[]
+  invoiceApprovals  InvoiceApproval[]
+}
+
+// Estados del proveedor (circuito anti-BEC):
+// PENDIENTE_DATOS -> DATOS_CARGADOS -> VALIDADO_TELEFONICAMENTE
+//   -> PRUEBA_ENVIADA -> PRUEBA_CONFIRMADA -> APROBADO | RECHAZADO
+model Supplier {
+  id          String   @id @default(cuid())
+  country     String // AR | UY | US
+  razonSocial String
+  taxId       String? // CUIT / RUT / EIN según país
+  domicilio   String?
+  website     String?
+  email       String?
+  // Teléfono declarado por el proveedor (NO confiable para validación)
+  phoneProvided String?
+  // Teléfono obtenido por fuente independiente (web oficial / registro público)
+  phoneIndependent String?
+  phoneSource      String?
+  phoneValidatedAt DateTime?
+  status      String   @default("PENDIENTE_DATOS")
+  accessToken String   @unique
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bankAccounts BankAccount[]
+  documents    Document[]
+  invoices     Invoice[]
+  redFlags     RedFlag[]
+  transfers    TestTransfer[]
+  auditLogs    AuditLog[]
+}
+
+// Datos bancarios con campos específicos por país
+model BankAccount {
+  id         String  @id @default(cuid())
+  supplierId String
+  titular    String
+  // Argentina
+  cbu      String?
+  aliasCbu String?
+  // Uruguay
+  bankName      String?
+  accountNumber String?
+  accountType   String?
+  // Estados Unidos
+  bankAddress   String?
+  routingNumber String?
+  status    String   @default("PENDIENTE")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  supplier  Supplier       @relation(fields: [supplierId], references: [id])
+  transfers TestTransfer[]
+}
+
+// Transferencia de prueba (monto simbólico) registrada por Tesorería
+model TestTransfer {
+  id            String    @id @default(cuid())
+  supplierId    String
+  bankAccountId String
+  amount        Float
+  currency      String
+  executedById  String
+  executedAt    DateTime  @default(now())
+  confirmedById String?
+  confirmedAt   DateTime?
+  notes         String?
+
+  supplier    Supplier    @relation(fields: [supplierId], references: [id])
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+}
+
+// Documentos (formulario de alta, constancias fiscales, W-9, facturas PDF/XML,
+// recibos de pago, certificados de retención). Encriptados en reposo (AES-256-GCM).
+model Document {
+  id         String   @id @default(cuid())
+  supplierId String
+  invoiceId  String?
+  type       String // ALTA | FISCAL | W9 | FACTURA | RECIBO_PAGO | RETENCION | OTRO
+  filename   String
+  storedName String
+  mimeType   String
+  size       Int
+  encrypted  Boolean  @default(true)
+  uploadedBy String // email de usuario interno o "proveedor"
+  createdAt  DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+  invoice  Invoice? @relation(fields: [invoiceId], references: [id])
+}
+
+// Comprobantes: flujo RECIBIDA -> EN_REVISION -> APROBADA_PARA_PAGO -> PROGRAMADA -> PAGADA
+model Invoice {
+  id         String   @id @default(cuid())
+  supplierId String
+  kind       String   @default("FACTURA") // FACTURA | NOTA_CREDITO | RECIBO
+  number     String
+  issueDate  DateTime
+  dueDate    DateTime?
+  amount     Float
+  currency   String   @default("ARS")
+  status     String   @default("RECIBIDA")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  supplier  Supplier          @relation(fields: [supplierId], references: [id])
+  documents Document[]
+  approvals InvoiceApproval[]
+}
+
+// Doble aprobación: aprobaciones individuales sobre una factura
+model InvoiceApproval {
+  id        String   @id @default(cuid())
+  invoiceId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([invoiceId, userId])
+}
+
+// Umbrales de doble aprobación por país
+model ApprovalRule {
+  id                String   @id @default(cuid())
+  country           String? // null = todos los países
+  threshold         Float
+  requiredApprovals Int
+  createdAt         DateTime @default(now())
+}
+
+// Alertas anti-BEC (typosquatting, cambio de datos bancarios, salto de protocolo)
+model RedFlag {
+  id         String   @id @default(cuid())
+  supplierId String
+  type       String // TYPOSQUATTING | CAMBIO_BANCARIO | TELEFONO_NO_INDEPENDIENTE | PROTOCOLO
+  message    String
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+}
+
+// Trazabilidad imborrable: quién, qué, cuándo y desde qué IP.
+// La aplicación solo inserta; nunca actualiza ni borra registros.
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  actorLabel String // nombre/email del usuario interno o "Proveedor (portal)"
+  action     String
+  entityType String
+  entityId   String?
+  supplierId String?
+  detail     String?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  user     User?     @relation(fields: [userId], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+}
