@@ -12,7 +12,14 @@ import {
   resolveRedFlag,
   uploadInternalDocument,
 } from '@/lib/actions/suppliers';
-import { COUNTRIES, Country, REQUIRED_DOCS, SUPPLIER_STATUS_LABELS, countryName } from '@/lib/countries';
+import {
+  COUNTRIES,
+  Country,
+  missingRequiredDocs,
+  REQUIRED_DOCS,
+  SUPPLIER_STATUS_LABELS,
+  countryName,
+} from '@/lib/countries';
 import { getBaseUrl } from '@/lib/urls';
 import { Flash, StatusBadge } from '@/components/Alerts';
 import { CopyButton } from '@/components/CopyButton';
@@ -27,6 +34,34 @@ const FLOW = [
   'PRUEBA_CONFIRMADA',
   'APROBADO',
 ];
+
+// Quién debe actuar en cada estado, para mostrarlo a todos los roles
+const NEXT_STEP: Record<string, { role: string; label: string }> = {
+  PENDIENTE_DATOS: {
+    role: 'Proveedor',
+    label: 'Debe completar sus datos, documentos obligatorios y cuenta bancaria desde su enlace único.',
+  },
+  DATOS_CARGADOS: {
+    role: 'Validación Datos',
+    label: 'Registrar la validación telefónica con un teléfono obtenido por fuente independiente.',
+  },
+  CORRECCIONES_SOLICITADAS: {
+    role: 'Proveedor',
+    label: 'Debe corregir su información según las observaciones y reenviarla desde su portal.',
+  },
+  VALIDADO_TELEFONICAMENTE: {
+    role: 'Tesorería',
+    label: 'Registrar la transferencia de prueba de monto simbólico.',
+  },
+  PRUEBA_ENVIADA: {
+    role: 'Tesorería',
+    label: 'Registrar la confirmación verbal de la transferencia (debe hacerlo otra persona, no quien la envió).',
+  },
+  PRUEBA_CONFIRMADA: {
+    role: 'Auditoría',
+    label: 'Revisar la trazabilidad y otorgar la aprobación final.',
+  },
+};
 
 export default async function SupplierDetailPage({
   params,
@@ -56,6 +91,17 @@ export default async function SupplierDetailPage({
   const portalUrl = `${getBaseUrl()}/portal/${supplier.accessToken}`;
 
   const can = (r: string) => role === r || role === 'ADMIN';
+
+  const ROLE_NAMES: Record<string, string> = {
+    VALIDACION: 'Validación Datos',
+    TESORERIA: 'Tesorería',
+    AUDITORIA: 'Auditoría',
+    COMPRAS: 'Compras',
+  };
+  const nextStep = NEXT_STEP[supplier.status];
+  const isAnotherRolesStep =
+    nextStep && role !== 'ADMIN' && nextStep.role !== 'Proveedor' && ROLE_NAMES[role] !== nextStep.role;
+  const missingDocs = missingRequiredDocs(supplier.country, supplier.documents);
 
   return (
     <>
@@ -167,6 +213,27 @@ export default async function SupplierDetailPage({
           Segregación de funciones: el sistema bloquea que una misma persona ejecute dos acciones
           consecutivas sobre este proveedor.
         </p>
+
+        {nextStep && (
+          <p className="alert" style={{ background: '#eff6ff', borderColor: '#bfdbfe', color: '#1e40af' }}>
+            👉 <strong>Próximo paso ({nextStep.role}):</strong> {nextStep.label}
+            {isAnotherRolesStep && (
+              <span style={{ fontWeight: 400 }}>
+                {' '}
+                (le corresponde al rol {nextStep.role}; usted está conectado con otro rol, por eso no ve
+                el formulario)
+              </span>
+            )}
+          </p>
+        )}
+
+        {supplier.status === 'DATOS_CARGADOS' && missingDocs.length > 0 && (
+          <p className="alert error">
+            ⚠️ La validación telefónica está <strong>bloqueada</strong> porque faltan documentos
+            obligatorios: <strong>{missingDocs.map((d) => d.label).join(', ')}</strong>. El proveedor debe
+            subirlos desde su portal (o Compras desde esta ficha, en la sección Documentación).
+          </p>
+        )}
 
         {can('VALIDACION') && supplier.status === 'DATOS_CARGADOS' && (
           <>
