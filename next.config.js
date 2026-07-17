@@ -2,7 +2,8 @@
 const nextConfig = {
   experimental: {
     serverActions: {
-      bodySizeLimit: '15mb',
+      // Vercel limita el cuerpo de la petición a ~4.5 MB
+      bodySizeLimit: '4500kb',
     },
   },
 };

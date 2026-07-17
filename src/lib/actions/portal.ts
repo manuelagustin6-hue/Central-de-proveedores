@@ -6,7 +6,7 @@ import { getSupplierByToken } from '../auth';
 import { audit } from '../audit';
 import { checkTyposquatting, holderMatchesRazonSocial, raiseRedFlag } from '../bec';
 import { validateBank, validateTaxId } from '../countries';
-import { saveEncrypted } from '../files';
+import { encryptFile, MAX_FILE_MSG, MAX_FILE_SIZE } from '../files';
 
 function backTo(token: string, error?: string, ok?: string): never {
   const q = error ? `?error=${encodeURIComponent(error)}` : ok ? `?ok=${encodeURIComponent(ok)}` : '';
@@ -139,15 +139,14 @@ export async function uploadSupplierDocument(formData: FormData) {
     const file = formData.get('file') as File | null;
     const type = String(formData.get('type') ?? 'OTRO');
     if (!file || file.size === 0) throw new Error('Debe seleccionar un archivo');
-    if (file.size > 10 * 1024 * 1024) throw new Error('El archivo supera los 10 MB');
+    if (file.size > MAX_FILE_SIZE) throw new Error(MAX_FILE_MSG);
 
-    const storedName = await saveEncrypted(Buffer.from(await file.arrayBuffer()));
     await db.document.create({
       data: {
         supplierId: supplier.id,
         type,
         filename: file.name,
-        storedName,
+        data: encryptFile(Buffer.from(await file.arrayBuffer())),
         mimeType: file.type || 'application/octet-stream',
         size: file.size,
         uploadedBy: 'proveedor',
@@ -185,7 +184,7 @@ export async function createInvoice(formData: FormData) {
     if (!issueDate) throw new Error('Debe indicar la fecha de emisión');
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('Monto inválido');
     if (!file || file.size === 0) throw new Error('Debe adjuntar el comprobante (PDF/XML)');
-    if (file.size > 10 * 1024 * 1024) throw new Error('El archivo supera los 10 MB');
+    if (file.size > MAX_FILE_SIZE) throw new Error(MAX_FILE_MSG);
     const okType = /pdf|xml/.test(file.type) || /\.(pdf|xml)$/i.test(file.name);
     if (!okType) throw new Error('Solo se aceptan archivos PDF o XML');
 
@@ -200,14 +199,13 @@ export async function createInvoice(formData: FormData) {
         currency,
       },
     });
-    const storedName = await saveEncrypted(Buffer.from(await file.arrayBuffer()));
     await db.document.create({
       data: {
         supplierId: supplier.id,
         invoiceId: invoice.id,
         type: 'FACTURA',
         filename: file.name,
-        storedName,
+        data: encryptFile(Buffer.from(await file.arrayBuffer())),
         mimeType: file.type || 'application/octet-stream',
         size: file.size,
         uploadedBy: 'proveedor',

@@ -1,8 +1,7 @@
-// Central de Proveedores — esquema de datos
-// SQLite en desarrollo; para producción cambiar provider a "postgresql".
+// Central de Proveedores — esquema de datos (PostgreSQL, ej. Neon)
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -97,14 +96,15 @@ model TestTransfer {
 }
 
 // Documentos (formulario de alta, constancias fiscales, W-9, facturas PDF/XML,
-// recibos de pago, certificados de retención). Encriptados en reposo (AES-256-GCM).
+// recibos de pago, certificados de retención). El contenido se guarda en la
+// base encriptado en reposo (AES-256-GCM) — compatible con hosting serverless.
 model Document {
   id         String   @id @default(cuid())
   supplierId String
   invoiceId  String?
   type       String // ALTA | FISCAL | W9 | FACTURA | RECIBO_PAGO | RETENCION | OTRO
   filename   String
-  storedName String
+  data       Bytes
   mimeType   String
   size       Int
   encrypted  Boolean  @default(true)

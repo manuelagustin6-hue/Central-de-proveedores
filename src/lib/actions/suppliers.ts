@@ -8,7 +8,7 @@ import { requireRole } from '../auth';
 import { audit, assertSegregation } from '../audit';
 import { checkTyposquatting, normalizePhone, raiseRedFlag } from '../bec';
 import { validateTaxId } from '../countries';
-import { saveEncrypted } from '../files';
+import { encryptFile, MAX_FILE_MSG, MAX_FILE_SIZE } from '../files';
 import { sendNotification } from '../notify';
 
 function backTo(path: string, error?: string, ok?: string): never {
@@ -302,15 +302,14 @@ export async function uploadInternalDocument(formData: FormData) {
     const file = formData.get('file') as File | null;
     const type = String(formData.get('type') ?? 'OTRO');
     if (!file || file.size === 0) throw new Error('Debe seleccionar un archivo');
-    if (file.size > 10 * 1024 * 1024) throw new Error('El archivo supera los 10 MB');
+    if (file.size > MAX_FILE_SIZE) throw new Error(MAX_FILE_MSG);
 
-    const storedName = await saveEncrypted(Buffer.from(await file.arrayBuffer()));
     const doc = await db.document.create({
       data: {
         supplierId,
         type,
         filename: file.name,
-        storedName,
+        data: encryptFile(Buffer.from(await file.arrayBuffer())),
         mimeType: file.type || 'application/octet-stream',
         size: file.size,
         uploadedBy: session.email,

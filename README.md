@@ -37,17 +37,31 @@ Flujo: `Recibida → En revisión → Aprobada para pago → Programada → Paga
 ## Stack
 
 - **Next.js 14** (App Router, Server Actions) + React + TypeScript
-- **Prisma** con SQLite en desarrollo — para producción cambiar el `provider` a `postgresql` en `prisma/schema.prisma`
+- **Prisma + PostgreSQL** (ej. [Neon](https://neon.tech), plan gratuito) — los documentos se guardan encriptados dentro de la base, por lo que funciona en hosting serverless (Vercel) sin almacenamiento de archivos adicional
 - CSS propio adaptable a móviles y escritorio
 
-## Puesta en marcha
+## Puesta en marcha local
 
 ```bash
-cp .env.example .env       # ajustar secretos en producción
+cp .env.example .env       # completar DATABASE_URL con una base PostgreSQL
 npm install
-npm run setup              # genera cliente Prisma, crea la BD y siembra datos demo
+npm run setup              # genera cliente Prisma, crea las tablas y siembra usuarios
 npm run dev                # o: npm run build && npm start
 ```
+
+## Publicar en internet (Vercel + Neon)
+
+1. **Neon** ([neon.tech](https://neon.tech)): crear cuenta gratuita → crear proyecto → copiar la *connection string* (`postgresql://...`).
+2. **Vercel** ([vercel.com](https://vercel.com)): crear cuenta con GitHub → *Add New → Project* → importar este repositorio.
+3. En la pantalla de importación, en **Environment Variables** cargar:
+   - `DATABASE_URL` → la connection string de Neon
+   - `SESSION_SECRET` → un valor aleatorio largo (`openssl rand -hex 32`)
+   - `FILE_ENCRYPTION_KEY` → 64 caracteres hexadecimales (`openssl rand -hex 32`)
+   - `APP_URL` → la URL final del sitio (ej. `https://tu-proyecto.vercel.app`)
+   - `SEED_PASSWORD` → contraseña inicial de los usuarios internos
+4. Deploy. El script `vercel-build` crea las tablas y siembra los usuarios automáticamente en el primer deploy.
+
+Nota: Vercel limita las subidas a ~4,5 MB por archivo; la aplicación valida 4 MB por documento.
 
 Usuarios demo (contraseña `demo1234`):
 
@@ -59,7 +73,7 @@ Usuarios demo (contraseña `demo1234`):
 | auditoria@demo.com | Auditoría |
 | admin@demo.com | Admin |
 
-Los enlaces de portal de los proveedores demo se imprimen al ejecutar el seed. El enlace de cada proveedor también se ve en su ficha interna.
+La contraseña inicial se define con `SEED_PASSWORD` (los usuarios se crean solo si la tabla está vacía). Con `SEED_DEMO=1` el seed además crea tres proveedores de ejemplo, uno por país; el enlace de portal de cada proveedor se ve en su ficha interna.
 
 ## Prueba end-to-end
 

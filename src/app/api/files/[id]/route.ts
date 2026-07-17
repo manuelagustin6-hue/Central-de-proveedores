@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { readEncrypted } from '@/lib/files';
+import { decryptFile } from '@/lib/files';
 
 /**
  * Descarga de documentos (desencriptados al vuelo).
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
 
   try {
-    const data = await readEncrypted(doc.storedName);
+    const data = decryptFile(Buffer.from(doc.data));
     return new NextResponse(new Uint8Array(data), {
       headers: {
         'Content-Type': doc.mimeType,

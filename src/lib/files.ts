@@ -1,32 +1,30 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-import { mkdir, readFile, writeFile } from 'fs/promises';
-import path from 'path';
 
-const STORAGE_DIR = path.join(process.cwd(), 'storage', 'uploads');
+// Encriptación de documentos en reposo (AES-256-GCM). El contenido cifrado se
+// guarda en la base de datos, por lo que funciona en hosting serverless
+// (Vercel) sin sistema de archivos persistente.
+
+// Vercel limita el cuerpo de la petición a ~4.5 MB
+export const MAX_FILE_SIZE = 4 * 1024 * 1024;
+export const MAX_FILE_MSG = 'El archivo supera los 4 MB';
 
 function getKey(): Buffer {
   const hex = process.env.FILE_ENCRYPTION_KEY || '00'.repeat(32);
   return Buffer.from(hex, 'hex');
 }
 
-/** Guarda un archivo encriptado en reposo con AES-256-GCM. Devuelve el nombre almacenado. */
-export async function saveEncrypted(data: Buffer): Promise<string> {
-  await mkdir(STORAGE_DIR, { recursive: true });
+/** Devuelve iv(12) + authTag(16) + ciphertext, listo para persistir. */
+export function encryptFile(data: Buffer): Buffer {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', getKey(), iv);
   const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  const storedName = randomBytes(16).toString('hex') + '.bin';
-  await writeFile(path.join(STORAGE_DIR, storedName), Buffer.concat([iv, tag, encrypted]));
-  return storedName;
+  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]);
 }
 
-export async function readEncrypted(storedName: string): Promise<Buffer> {
-  if (!/^[a-f0-9]{32}\.bin$/.test(storedName)) throw new Error('Nombre de archivo inválido');
-  const raw = await readFile(path.join(STORAGE_DIR, storedName));
-  const iv = raw.subarray(0, 12);
-  const tag = raw.subarray(12, 28);
-  const encrypted = raw.subarray(28);
+export function decryptFile(stored: Buffer): Buffer {
+  const iv = stored.subarray(0, 12);
+  const tag = stored.subarray(12, 28);
+  const encrypted = stored.subarray(28);
   const decipher = createDecipheriv('aes-256-gcm', getKey(), iv);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(encrypted), decipher.final()]);

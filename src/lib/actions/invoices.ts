@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { db } from '../db';
 import { requireRole } from '../auth';
 import { audit } from '../audit';
-import { saveEncrypted } from '../files';
+import { encryptFile, MAX_FILE_MSG, MAX_FILE_SIZE } from '../files';
 
 function backTo(path: string, error?: string, ok?: string): never {
   const q = error ? `?error=${encodeURIComponent(error)}` : ok ? `?ok=${encodeURIComponent(ok)}` : '';
@@ -117,17 +117,16 @@ export async function uploadPaymentReceipt(formData: FormData) {
     const markPaid = formData.get('markPaid') === 'on';
     const file = formData.get('file') as File | null;
     if (!file || file.size === 0) throw new Error('Debe seleccionar un archivo');
-    if (file.size > 10 * 1024 * 1024) throw new Error('El archivo supera los 10 MB');
+    if (file.size > MAX_FILE_SIZE) throw new Error(MAX_FILE_MSG);
 
     const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
-    const storedName = await saveEncrypted(Buffer.from(await file.arrayBuffer()));
     const doc = await db.document.create({
       data: {
         supplierId: invoice.supplierId,
         invoiceId,
         type,
         filename: file.name,
-        storedName,
+        data: encryptFile(Buffer.from(await file.arrayBuffer())),
         mimeType: file.type || 'application/octet-stream',
         size: file.size,
         uploadedBy: session.email,
