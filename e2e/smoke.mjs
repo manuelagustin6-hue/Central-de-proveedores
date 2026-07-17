@@ -100,6 +100,18 @@ for (const docType of ['FISCAL', 'BANCARIO']) {
 }
 check('Checklist de documentos completa', (await pp.locator('.badge.ok', { hasText: 'Subido' }).count()) === 2);
 
+// 3b-bis. Auditoría solicita correcciones y el proveedor corrige y reenvía
+const aud0 = await loginAs('auditoria@demo.com');
+await aud0.page.goto(supplierUrl);
+await aud0.page.fill('input[name=note]', 'Aclarar el domicilio fiscal completo');
+await act(aud0.page, 'button:has-text("Solicitar correcciones")');
+check('Auditoría solicita correcciones', (await aud0.page.content()).includes('Correcciones solicitadas'));
+await pp.goto(`${BASE}/portal/${token}`);
+check('Portal muestra las observaciones al proveedor', (await pp.content()).includes('Aclarar el domicilio fiscal completo'));
+await pp.fill('input[name=domicilio]', 'Av. Siempreviva 123, Piso 2, CABA');
+await act(pp, 'form >> nth=0 >> button[type=submit]');
+check('Proveedor corrige y reenvía', (await pp.content()).includes('Datos guardados'));
+
 // 3c. Validación telefónica: mismo teléfono del proveedor → bloqueado
 await val.page.goto(supplierUrl);
 await val.page.fill('input[name=phoneIndependent]', '+54 11 4444 5555');

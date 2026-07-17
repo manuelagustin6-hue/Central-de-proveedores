@@ -8,6 +8,7 @@ import {
   registerPhoneValidation,
   registerTestTransfer,
   rejectSupplier,
+  requestCorrections,
   resolveRedFlag,
   uploadInternalDocument,
 } from '@/lib/actions/suppliers';
@@ -240,6 +241,32 @@ export default async function SupplierDetailPage({
             </form>
           </>
         )}
+
+        {supplier.status === 'CORRECCIONES_SOLICITADAS' && (
+          <p className="alert error">
+            ✏️ Correcciones solicitadas al proveedor: <strong>{supplier.correctionNote}</strong>
+            <br />
+            <span className="muted">A la espera de que el proveedor corrija y reenvíe desde su portal.</span>
+          </p>
+        )}
+
+        {can('AUDITORIA') &&
+          ['DATOS_CARGADOS', 'VALIDADO_TELEFONICAMENTE', 'PRUEBA_ENVIADA', 'PRUEBA_CONFIRMADA'].includes(
+            supplier.status,
+          ) && (
+            <>
+              <h3>Solicitar correcciones (rol Auditoría)</h3>
+              <p className="muted">
+                El proveedor recibe un email con las observaciones y las ve en su portal. Al corregir,
+                el circuito de validación se reinicia.
+              </p>
+              <form action={requestCorrections} className="inline">
+                <input type="hidden" name="supplierId" value={supplier.id} />
+                <input name="note" placeholder="Detalle qué debe corregir el proveedor" required style={{ flex: 1 }} />
+                <button className="secondary" type="submit">Solicitar correcciones</button>
+              </form>
+            </>
+          )}
 
         {can('AUDITORIA') && !['APROBADO', 'RECHAZADO'].includes(supplier.status) && (
           <>

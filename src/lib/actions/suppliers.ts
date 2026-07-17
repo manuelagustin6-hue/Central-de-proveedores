@@ -239,7 +239,10 @@ export async function finalApprove(formData: FormData) {
     if (pendingFlags > 0) throw new Error(`Hay ${pendingFlags} alerta(s) de seguridad sin resolver. Resuélvalas antes de aprobar.`);
     await assertSegregation(supplierId, session);
 
-    await db.supplier.update({ where: { id: supplierId }, data: { status: 'APROBADO' } });
+    await db.supplier.update({
+      where: { id: supplierId },
+      data: { status: 'APROBADO', correctionNote: null },
+    });
     await db.bankAccount.updateMany({ where: { supplierId, active: true }, data: { status: 'APROBADA' } });
     await audit({
       session,
@@ -249,10 +252,61 @@ export async function finalApprove(formData: FormData) {
       supplierId,
       detail: 'Aprobación final de la cuenta del proveedor',
     });
+    if (supplier.email) {
+      await sendNotification(
+        supplier.email,
+        'Su alta de proveedor fue aprobada',
+        `Estimado proveedor:\n\nSu alta fue verificada y aprobada. Ya puede cargar facturas y consultar el estado de sus pagos desde su portal:\n${getBaseUrl()}/portal/${supplier.accessToken}\n\nGracias.`,
+      );
+    }
   } catch (e) {
     backTo(path, e instanceof Error ? e.message : 'Error inesperado');
   }
   backTo(path, undefined, 'Proveedor aprobado');
+}
+
+/**
+ * Auditoría: solicita correcciones al proveedor. El proveedor ve las
+ * observaciones en su portal, corrige y reenvía; el circuito de validación
+ * anti-BEC se reinicia desde "Datos cargados".
+ */
+export async function requestCorrections(formData: FormData) {
+  const supplierId = String(formData.get('supplierId'));
+  const path = `/proveedores/${supplierId}`;
+  try {
+    const session = requireRole('AUDITORIA');
+    const note = String(formData.get('note') ?? '').trim();
+    if (!note) throw new Error('Debe detallar las correcciones solicitadas');
+
+    const supplier = await db.supplier.findUniqueOrThrow({ where: { id: supplierId } });
+    const allowed = ['DATOS_CARGADOS', 'VALIDADO_TELEFONICAMENTE', 'PRUEBA_ENVIADA', 'PRUEBA_CONFIRMADA'];
+    if (!allowed.includes(supplier.status)) {
+      throw new Error('Solo se pueden solicitar correcciones a proveedores en proceso de validación');
+    }
+
+    await db.supplier.update({
+      where: { id: supplierId },
+      data: { status: 'CORRECCIONES_SOLICITADAS', correctionNote: note },
+    });
+    await audit({
+      session,
+      action: 'SOLICITUD_CORRECCIONES',
+      entityType: 'Supplier',
+      entityId: supplierId,
+      supplierId,
+      detail: note,
+    });
+    if (supplier.email) {
+      await sendNotification(
+        supplier.email,
+        'Correcciones requeridas en su alta de proveedor',
+        `Estimado proveedor:\n\nRevisamos su información y necesitamos que realice las siguientes correcciones:\n\n${note}\n\nIngrese a su portal para corregir y reenviar:\n${getBaseUrl()}/portal/${supplier.accessToken}\n\nGracias.`,
+      );
+    }
+  } catch (e) {
+    backTo(path, e instanceof Error ? e.message : 'Error inesperado');
+  }
+  backTo(path, undefined, 'Correcciones solicitadas y notificadas al proveedor');
 }
 
 /** Auditoría: rechazo del proveedor. */

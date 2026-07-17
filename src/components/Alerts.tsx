@@ -7,6 +7,7 @@ export function Flash({ searchParams }: { searchParams?: { error?: string; ok?: 
 const STATUS_CLASS: Record<string, string> = {
   PENDIENTE_DATOS: '',
   DATOS_CARGADOS: 'info',
+  CORRECCIONES_SOLICITADAS: 'danger',
   VALIDADO_TELEFONICAMENTE: 'info',
   PRUEBA_ENVIADA: 'warn',
   PRUEBA_CONFIRMADA: 'warn',

@@ -63,6 +63,19 @@ export default async function PortalPage({
       <main className="container">
         <Flash searchParams={searchParams} />
 
+        {supplier.status === 'CORRECCIONES_SOLICITADAS' && supplier.correctionNote && (
+          <div className="alert redflag">
+            ✏️ <strong>Se requieren correcciones en su información:</strong>
+            <br />
+            {supplier.correctionNote}
+            <br />
+            <span style={{ fontWeight: 400 }}>
+              Corrija los datos o documentos indicados y vuelva a guardarlos — su alta se reenviará
+              automáticamente a verificación.
+            </span>
+          </div>
+        )}
+
         <div className="grid cols-2">
           <div className="card">
             <h2>1. Datos de la empresa</h2>

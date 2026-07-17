@@ -63,6 +63,7 @@ export function validateBank(country: string, data: Record<string, string>): str
 export const SUPPLIER_STATUS_LABELS: Record<string, string> = {
   PENDIENTE_DATOS: 'Pendiente de datos',
   DATOS_CARGADOS: 'Datos cargados',
+  CORRECCIONES_SOLICITADAS: 'Correcciones solicitadas',
   VALIDADO_TELEFONICAMENTE: 'Validado telefónicamente',
   PRUEBA_ENVIADA: 'Transferencia de prueba enviada',
   PRUEBA_CONFIRMADA: 'Transferencia confirmada',

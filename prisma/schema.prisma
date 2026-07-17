@@ -41,8 +41,9 @@ model Supplier {
   phoneIndependent String?
   phoneSource      String?
   phoneValidatedAt DateTime?
-  status      String   @default("PENDIENTE_DATOS")
-  accessToken String   @unique
+  status         String  @default("PENDIENTE_DATOS")
+  correctionNote String?
+  accessToken    String  @unique
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

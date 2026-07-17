@@ -5,6 +5,8 @@ import { db } from '../db';
 import { requireRole } from '../auth';
 import { audit } from '../audit';
 import { encryptFile, MAX_FILE_MSG, MAX_FILE_SIZE } from '../files';
+import { sendNotification } from '../notify';
+import { getBaseUrl } from '../urls';
 
 function backTo(path: string, error?: string, ok?: string): never {
   const q = error ? `?error=${encodeURIComponent(error)}` : ok ? `?ok=${encodeURIComponent(ok)}` : '';
@@ -119,7 +121,10 @@ export async function uploadPaymentReceipt(formData: FormData) {
     if (!file || file.size === 0) throw new Error('Debe seleccionar un archivo');
     if (file.size > MAX_FILE_SIZE) throw new Error(MAX_FILE_MSG);
 
-    const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+    const invoice = await db.invoice.findUniqueOrThrow({
+      where: { id: invoiceId },
+      include: { supplier: true },
+    });
     const doc = await db.document.create({
       data: {
         supplierId: invoice.supplierId,
@@ -144,6 +149,19 @@ export async function uploadPaymentReceipt(formData: FormData) {
       supplierId: invoice.supplierId,
       detail: `${type}: ${file.name} (factura ${invoice.number})`,
     });
+    if (invoice.supplier.email) {
+      await sendNotification(
+        invoice.supplier.email,
+        markPaid
+          ? `Su factura ${invoice.number} fue pagada`
+          : `Nuevo comprobante disponible para su factura ${invoice.number}`,
+        `Estimado proveedor:\n\n${
+          markPaid
+            ? `Registramos el pago de su factura ${invoice.number} por ${invoice.amount} ${invoice.currency}.`
+            : `Hay un nuevo comprobante disponible para su factura ${invoice.number}.`
+        }\nPuede descargar el comprobante desde su portal:\n${getBaseUrl()}/portal/${invoice.supplier.accessToken}\n\nGracias.`,
+      );
+    }
   } catch (e) {
     backTo('/facturas', e instanceof Error ? e.message : 'Error inesperado');
   }

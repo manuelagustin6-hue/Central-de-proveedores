@@ -44,7 +44,10 @@ export async function updateSupplierData(formData: FormData) {
         email: email || supplier.email,
         contactName: contactName || null,
         phoneProvided: phoneProvided || null,
-        status: supplier.status === 'PENDIENTE_DATOS' ? 'PENDIENTE_DATOS' : supplier.status,
+        // Si había correcciones pendientes, el reenvío reinicia la validación
+        ...(supplier.status === 'CORRECCIONES_SOLICITADAS'
+          ? { status: 'DATOS_CARGADOS', correctionNote: null }
+          : {}),
       },
     });
 
@@ -154,6 +157,12 @@ export async function uploadSupplierDocument(formData: FormData) {
         uploadedBy: 'proveedor',
       },
     });
+    if (supplier.status === 'CORRECCIONES_SOLICITADAS') {
+      await db.supplier.update({
+        where: { id: supplier.id },
+        data: { status: 'DATOS_CARGADOS', correctionNote: null },
+      });
+    }
     await audit({
       actorLabel: `Proveedor (portal): ${supplier.razonSocial}`,
       action: 'CARGA_DOCUMENTO_PROVEEDOR',
