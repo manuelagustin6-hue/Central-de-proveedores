@@ -16,9 +16,11 @@ function backTo(path: string, error?: string, ok?: string): never {
 /** Compras/Auditoría: toma la factura para revisión. */
 export async function startReview(formData: FormData) {
   const invoiceId = String(formData.get('invoiceId'));
+  let path = '/facturas';
   try {
     const session = requireRole('COMPRAS', 'AUDITORIA');
     const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+    path = `/proveedores/${invoice.supplierId}/facturas`;
     if (invoice.status !== 'RECIBIDA') throw new Error('La factura no está en estado Recibida');
     await db.invoice.update({ where: { id: invoiceId }, data: { status: 'EN_REVISION' } });
     await audit({
@@ -30,9 +32,9 @@ export async function startReview(formData: FormData) {
       detail: `Factura ${invoice.number}`,
     });
   } catch (e) {
-    backTo('/facturas', e instanceof Error ? e.message : 'Error inesperado');
+    backTo(path, e instanceof Error ? e.message : 'Error inesperado');
   }
-  backTo('/facturas', undefined, 'Factura en revisión');
+  backTo(path, undefined, 'Factura en revisión');
 }
 
 /**
@@ -42,12 +44,14 @@ export async function startReview(formData: FormData) {
 export async function approveInvoice(formData: FormData) {
   const invoiceId = String(formData.get('invoiceId'));
   let okMsg = 'Factura aprobada para pago';
+  let path = '/facturas';
   try {
     const session = requireRole('AUDITORIA', 'COMPRAS');
     const invoice = await db.invoice.findUniqueOrThrow({
       where: { id: invoiceId },
       include: { supplier: true, approvals: true },
     });
+    path = `/proveedores/${invoice.supplierId}/facturas`;
     if (invoice.status !== 'EN_REVISION') throw new Error('La factura debe estar En revisión');
     if (invoice.supplier.status !== 'APROBADO') {
       throw new Error('El proveedor aún no tiene la cuenta aprobada por Auditoría (protocolo anti-BEC incompleto)');
@@ -83,17 +87,19 @@ export async function approveInvoice(formData: FormData) {
       okMsg = `Aprobación registrada (${count}/${required}). Faltan ${required - count} aprobación(es) por el umbral configurado.`;
     }
   } catch (e) {
-    backTo('/facturas', e instanceof Error ? e.message : 'Error inesperado');
+    backTo(path, e instanceof Error ? e.message : 'Error inesperado');
   }
-  backTo('/facturas', undefined, okMsg);
+  backTo(path, undefined, okMsg);
 }
 
 /** Tesorería: programa el pago de la factura. */
 export async function scheduleInvoice(formData: FormData) {
   const invoiceId = String(formData.get('invoiceId'));
+  let path = '/facturas';
   try {
     const session = requireRole('TESORERIA');
     const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+    path = `/proveedores/${invoice.supplierId}/facturas`;
     if (invoice.status !== 'APROBADA_PARA_PAGO') throw new Error('La factura debe estar Aprobada para pago');
     await db.invoice.update({ where: { id: invoiceId }, data: { status: 'PROGRAMADA' } });
     await audit({
@@ -105,14 +111,15 @@ export async function scheduleInvoice(formData: FormData) {
       detail: `Factura ${invoice.number}`,
     });
   } catch (e) {
-    backTo('/facturas', e instanceof Error ? e.message : 'Error inesperado');
+    backTo(path, e instanceof Error ? e.message : 'Error inesperado');
   }
-  backTo('/facturas', undefined, 'Pago programado');
+  backTo(path, undefined, 'Pago programado');
 }
 
 /** Tesorería: sube el recibo de pago / certificado de retención y marca la factura como pagada. */
 export async function uploadPaymentReceipt(formData: FormData) {
   const invoiceId = String(formData.get('invoiceId'));
+  let path = '/facturas';
   try {
     const session = requireRole('TESORERIA');
     const type = String(formData.get('type') ?? 'RECIBO_PAGO');
@@ -125,6 +132,7 @@ export async function uploadPaymentReceipt(formData: FormData) {
       where: { id: invoiceId },
       include: { supplier: true },
     });
+    path = `/proveedores/${invoice.supplierId}/facturas`;
     const doc = await db.document.create({
       data: {
         supplierId: invoice.supplierId,
@@ -163,7 +171,7 @@ export async function uploadPaymentReceipt(formData: FormData) {
       );
     }
   } catch (e) {
-    backTo('/facturas', e instanceof Error ? e.message : 'Error inesperado');
+    backTo(path, e instanceof Error ? e.message : 'Error inesperado');
   }
-  backTo('/facturas', undefined, 'Comprobante cargado');
+  backTo(path, undefined, 'Comprobante cargado');
 }

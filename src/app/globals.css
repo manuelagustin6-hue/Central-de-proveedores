@@ -180,6 +180,29 @@ button.small, .btn.small { padding: 5px 10px; font-size: 13px; }
 .steps .step.done { background: var(--ok-bg); color: var(--ok); font-weight: 600; }
 .steps .step.current { background: var(--primary); color: #fff; font-weight: 600; }
 
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.tabs .tab {
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--muted);
+  border-radius: 8px 8px 0 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+.tabs .tab:hover { background: #e8edf5; text-decoration: none; }
+.tabs .tab.active {
+  color: var(--primary-dark);
+  border-bottom-color: var(--primary);
+  background: #eff6ff;
+}
+
 .portal-header {
   background: #0f1e3d;
   color: #fff;

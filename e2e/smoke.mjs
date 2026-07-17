@@ -19,7 +19,7 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PAT
 async function act(page, selector) {
   const before = page.url();
   await page.click(selector);
-  await page.waitForURL((u) => u.href !== before && /[?](ok|error)=/.test(u.href));
+  await page.waitForURL((u) => u.href !== before && /[?&](ok|error)=/.test(u.href));
 }
 
 async function loginAs(email) {
@@ -50,7 +50,7 @@ check('Se genera enlace único de portal', !!token && token.length >= 40);
 // 2. Proveedor completa datos y banco desde el portal
 const pctx = await browser.newContext();
 const pp = await pctx.newPage();
-await pp.goto(`${BASE}/portal/${token}`);
+await pp.goto(`${BASE}/portal/${token}?tab=datos`);
 check('Portal muestra campo CBU para Argentina', await pp.locator('input[name=cbu]').count() === 1);
 await pp.fill('input[name=taxId]', '30-71234567-8');
 await pp.fill('input[name=domicilio]', 'Av. Siempreviva 123, CABA');
@@ -67,7 +67,7 @@ await pp.fill('input[name=cbu]', '2850590940090418135201');
 {
   const before = pp.url();
   await pp.locator('form').nth(1).locator('button[type=submit]').click();
-  await pp.waitForURL((u) => u.href !== before && /[?](ok|error)=/.test(u.href));
+  await pp.waitForURL((u) => u.href !== before && /[?&](ok|error)=/.test(u.href));
 }
 check('Bloquea titular distinto de razón social', (await pp.content()).includes('no coincide con la raz'));
 
@@ -77,7 +77,7 @@ await pp.fill('input[name=cbu]', '2850590940090418135201');
 {
   const before = pp.url();
   await pp.locator('form').nth(1).locator('button[type=submit]').click();
-  await pp.waitForURL((u) => u.href !== before && /[?](ok|error)=/.test(u.href));
+  await pp.waitForURL((u) => u.href !== before && /[?&](ok|error)=/.test(u.href));
 }
 check('Proveedor carga datos bancarios', (await pp.content()).includes('Datos bancarios guardados'));
 
@@ -92,7 +92,7 @@ check('Bloquea validación sin documentos obligatorios', (await val.page.content
 // 3b. El proveedor sube los documentos obligatorios (AR: AFIP + constancia CBU)
 await pp.goto(`${BASE}/portal/${token}`);
 for (const docType of ['FISCAL', 'BANCARIO']) {
-  await pp.goto(`${BASE}/portal/${token}`);
+  await pp.goto(`${BASE}/portal/${token}?tab=documentos`);
   await pp.setInputFiles(`#doc-${docType} input[type=file]`, {
     name: `${docType.toLowerCase()}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 doc'),
   });
@@ -106,7 +106,7 @@ await aud0.page.goto(supplierUrl);
 await aud0.page.fill('input[name=note]', 'Aclarar el domicilio fiscal completo');
 await act(aud0.page, 'button:has-text("Solicitar correcciones")');
 check('Auditoría solicita correcciones', (await aud0.page.content()).includes('Correcciones solicitadas'));
-await pp.goto(`${BASE}/portal/${token}`);
+await pp.goto(`${BASE}/portal/${token}?tab=datos`);
 check('Portal muestra las observaciones al proveedor', (await pp.content()).includes('Aclarar el domicilio fiscal completo'));
 await pp.fill('input[name=domicilio]', 'Av. Siempreviva 123, Piso 2, CABA');
 await act(pp, 'form >> nth=0 >> button[type=submit]');
@@ -159,7 +159,7 @@ await act(aud.page, 'text=Otorgar aprobación final');
 check('Aprobación final otorgada', (await aud.page.content()).includes('Proveedor aprobado'));
 
 // 7. Proveedor aprobado carga una factura
-await pp.goto(`${BASE}/portal/${token}`);
+await pp.goto(`${BASE}/portal/${token}?tab=facturas`);
 check('Portal habilita carga de facturas tras aprobación', await pp.locator('input[name=number]').count() === 1);
 await pp.selectOption('select[name=kind]', 'FACTURA');
 await pp.fill('input[name=number]', '0001-00001234');
@@ -173,6 +173,8 @@ check('Proveedor carga factura', (await pp.content()).includes('Comprobante reci
 
 // 8. Doble aprobación (monto 2.5M > umbral 1M requiere 2 aprobaciones)
 await aud.page.goto(`${BASE}/facturas`);
+check('Resumen de facturas lista al proveedor', (await aud.page.content()).includes('Proveedor Test E2E'));
+await aud.page.goto(`${supplierUrl}/facturas`);
 await act(aud.page, 'text=Pasar a revisión');
 await act(aud.page, 'text=Aprobar para pago');
 check('Primera aprobación no alcanza (doble aprobación)', (await aud.page.content()).includes('1/2'));
@@ -180,12 +182,12 @@ check('Primera aprobación no alcanza (doble aprobación)', (await aud.page.cont
 await act(aud.page, 'text=Aprobar para pago');
 check('Bloquea doble aprobación del mismo usuario', (await aud.page.content()).includes('ya aprobó'));
 // segunda aprobación por compras
-await compras.page.goto(`${BASE}/facturas`);
+await compras.page.goto(`${supplierUrl}/facturas`);
 await act(compras.page, 'text=Aprobar para pago');
 check('Segunda aprobación completa el umbral', (await compras.page.content()).includes('Aprobada para pago'));
 
 // 9. Tesorería programa y paga con recibo
-await tes.page.goto(`${BASE}/facturas`);
+await tes.page.goto(`${supplierUrl}/facturas`);
 await act(tes.page, 'text=Programar pago');
 await tes.page.setInputFiles('input[name=file]', {
   name: 'recibo.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 recibo'),
@@ -195,7 +197,7 @@ await act(tes.page, 'button:has-text("Subir")');
 check('Factura pagada con recibo', (await tes.page.content()).includes('Comprobante cargado'));
 
 // 10. Proveedor descarga el recibo desde su portal
-await pp.goto(`${BASE}/portal/${token}`);
+await pp.goto(`${BASE}/portal/${token}?tab=facturas`);
 const html = await pp.content();
 check('Proveedor ve factura Pagada', html.includes('Pagada'));
 check('Proveedor puede descargar recibo', html.includes('recibo.pdf'));

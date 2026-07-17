@@ -8,9 +8,11 @@ import { checkTyposquatting, holderMatchesRazonSocial, raiseRedFlag } from '../b
 import { validateBank, validateTaxId } from '../countries';
 import { encryptFile, MAX_FILE_MSG, MAX_FILE_SIZE } from '../files';
 
-function backTo(token: string, error?: string, ok?: string): never {
-  const q = error ? `?error=${encodeURIComponent(error)}` : ok ? `?ok=${encodeURIComponent(ok)}` : '';
-  redirect(`/portal/${token}${q}`);
+function backTo(token: string, tab: string, error?: string, ok?: string): never {
+  const q = new URLSearchParams({ tab });
+  if (error) q.set('error', error);
+  else if (ok) q.set('ok', ok);
+  redirect(`/portal/${token}?${q.toString()}`);
 }
 
 /** Proveedor: actualiza razón social, Tax ID, domicilio, sitio web y contacto. */
@@ -63,9 +65,9 @@ export async function updateSupplierData(formData: FormData) {
       detail: 'El proveedor actualizó sus datos desde el portal',
     });
   } catch (e) {
-    backTo(token, e instanceof Error ? e.message : 'Error inesperado');
+    backTo(token, 'datos', e instanceof Error ? e.message : 'Error inesperado');
   }
-  backTo(token, undefined, 'Datos guardados correctamente');
+  backTo(token, 'datos', undefined, 'Datos guardados correctamente');
 }
 
 /**
@@ -130,9 +132,9 @@ export async function saveBankData(formData: FormData) {
         : 'El proveedor cargó sus datos bancarios',
     });
   } catch (e) {
-    backTo(token, e instanceof Error ? e.message : 'Error inesperado');
+    backTo(token, 'datos', e instanceof Error ? e.message : 'Error inesperado');
   }
-  backTo(token, undefined, 'Datos bancarios guardados. Quedan pendientes de validación anti-fraude.');
+  backTo(token, 'datos', undefined, 'Datos bancarios guardados. Quedan pendientes de validación anti-fraude.');
 }
 
 /** Proveedor: sube documentos obligatorios (alta, constancias fiscales, W-9). */
@@ -171,9 +173,9 @@ export async function uploadSupplierDocument(formData: FormData) {
       detail: `${type}: ${file.name}`,
     });
   } catch (e) {
-    backTo(token, e instanceof Error ? e.message : 'Error inesperado');
+    backTo(token, 'documentos', e instanceof Error ? e.message : 'Error inesperado');
   }
-  backTo(token, undefined, 'Documento subido correctamente');
+  backTo(token, 'documentos', undefined, 'Documento subido correctamente');
 }
 
 /** Proveedor: adjunta una factura / nota de crédito con sus datos. */
@@ -231,7 +233,7 @@ export async function createInvoice(formData: FormData) {
       detail: `${kind} ${number} por ${amount} ${currency}`,
     });
   } catch (e) {
-    backTo(token, e instanceof Error ? e.message : 'Error inesperado');
+    backTo(token, 'facturas', e instanceof Error ? e.message : 'Error inesperado');
   }
-  backTo(token, undefined, 'Comprobante recibido correctamente');
+  backTo(token, 'facturas', undefined, 'Comprobante recibido correctamente');
 }
