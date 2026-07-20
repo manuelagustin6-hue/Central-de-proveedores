@@ -213,5 +213,24 @@ const audHtml = await aud.page.content();
 check('Audit log registra el circuito completo',
   audHtml.includes('APROBACION_FINAL') && audHtml.includes('VALIDACION_BLOQUEADA') && audHtml.includes('CARGA_FACTURA'));
 
+// 12. Administración de usuarios: admin crea un usuario y este puede ingresar
+const admin = await loginAs('admin@demo.com');
+await admin.page.goto(`${BASE}/usuarios`);
+await admin.page.fill('input[name=name]', 'Prueba Nueva');
+await admin.page.fill('input[name=email]', 'nueva@demo.com');
+await admin.page.selectOption('select[name=role]', 'COMPRAS');
+await admin.page.fill('input[name=password]', 'clave12345');
+await act(admin.page, 'button:has-text("Crear usuario")');
+check('Admin crea un usuario nuevo', (await admin.page.content()).includes('Usuario creado'));
+
+const nctx = await browser.newContext();
+const np = await nctx.newPage();
+await np.goto(`${BASE}/login`);
+await np.fill('input[name=email]', 'nueva@demo.com');
+await np.fill('input[name=password]', 'clave12345');
+await np.click('button[type=submit]');
+await np.waitForURL('**/dashboard');
+check('El usuario nuevo puede ingresar', np.url().includes('/dashboard'));
+
 await browser.close();
 console.log(results.join('\n'));

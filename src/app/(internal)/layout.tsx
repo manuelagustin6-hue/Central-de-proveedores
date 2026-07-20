@@ -28,14 +28,19 @@ export default function InternalLayout({ children }: { children: React.ReactNode
               ...(session.role === 'AUDITORIA' || session.role === 'ADMIN'
                 ? [{ href: '/auditoria', label: '🔍 Auditoría' }]
                 : []),
-              ...(session.role === 'ADMIN' ? [{ href: '/configuracion', label: '⚙️ Configuración' }] : []),
+              ...(session.role === 'ADMIN'
+                ? [
+                    { href: '/usuarios', label: '👥 Usuarios' },
+                    { href: '/configuracion', label: '⚙️ Configuración' },
+                  ]
+                : []),
             ]}
           />
         </nav>
         <div className="user">
-          <span>
+          <a href="/perfil" style={{ color: 'inherit' }} title="Mi perfil">
             {session.name} <span className="role-chip">{ROLE_LABELS[session.role] ?? session.role}</span>
-          </span>
+          </a>
           <form action={logout}>
             <button className="secondary small" type="submit">
               Salir
