@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { logout } from '@/lib/actions/auth';
+import { NavLinks } from '@/components/NavLinks';
 
 const ROLE_LABELS: Record<string, string> = {
   COMPRAS: 'Compras',
@@ -20,13 +20,17 @@ export default function InternalLayout({ children }: { children: React.ReactNode
       <header className="topbar">
         <span className="brand">Central de Proveedores</span>
         <nav>
-          <Link href="/dashboard">Inicio</Link>
-          <Link href="/proveedores">Proveedores</Link>
-          <Link href="/facturas">Facturas</Link>
-          {(session.role === 'AUDITORIA' || session.role === 'ADMIN') && (
-            <Link href="/auditoria">Auditoría</Link>
-          )}
-          {session.role === 'ADMIN' && <Link href="/configuracion">Configuración</Link>}
+          <NavLinks
+            links={[
+              { href: '/dashboard', label: '🏠 Inicio' },
+              { href: '/proveedores', label: '🏢 Proveedores' },
+              { href: '/facturas', label: '🧾 Facturas' },
+              ...(session.role === 'AUDITORIA' || session.role === 'ADMIN'
+                ? [{ href: '/auditoria', label: '🔍 Auditoría' }]
+                : []),
+              ...(session.role === 'ADMIN' ? [{ href: '/configuracion', label: '⚙️ Configuración' }] : []),
+            ]}
+          />
         </nav>
         <div className="user">
           <span>

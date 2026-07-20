@@ -25,6 +25,7 @@ async function act(page, selector) {
 async function loginAs(email) {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
+  page.on('dialog', (d) => d.accept());
   await page.goto(`${BASE}/login`);
   await page.fill('input[name=email]', email);
   await page.fill('input[name=password]', 'demo1234');
@@ -50,6 +51,7 @@ check('Se genera enlace único de portal', !!token && token.length >= 40);
 // 2. Proveedor completa datos y banco desde el portal
 const pctx = await browser.newContext();
 const pp = await pctx.newPage();
+pp.on('dialog', (d) => d.accept());
 await pp.goto(`${BASE}/portal/${token}?tab=datos`);
 check('Portal muestra campo CBU para Argentina', await pp.locator('input[name=cbu]').count() === 1);
 await pp.fill('input[name=taxId]', '30-71234567-8');

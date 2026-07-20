@@ -1,6 +1,19 @@
-export function Flash({ searchParams }: { searchParams?: { error?: string; ok?: string } }) {
-  if (searchParams?.error) return <div className="alert error">⚠️ {searchParams.error}</div>;
-  if (searchParams?.ok) return <div className="alert ok">✓ {searchParams.ok}</div>;
+export function Flash({ searchParams }: { searchParams?: { error?: string; ok?: string; tab?: string } }) {
+  const close = searchParams?.tab ? `?tab=${searchParams.tab}` : '?';
+  if (searchParams?.error)
+    return (
+      <div className="alert error" role="alert">
+        ⚠️ {searchParams.error}
+        <a className="alert-close" href={close} aria-label="Cerrar">✕</a>
+      </div>
+    );
+  if (searchParams?.ok)
+    return (
+      <div className="alert ok" role="status">
+        ✓ {searchParams.ok}
+        <a className="alert-close" href={close} aria-label="Cerrar">✕</a>
+      </div>
+    );
   return null;
 }
 

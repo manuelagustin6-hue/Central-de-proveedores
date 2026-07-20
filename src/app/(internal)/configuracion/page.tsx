@@ -39,7 +39,7 @@ export default async function ConfigPage({ searchParams }: { searchParams: { err
                   <td>
                     <form action={deleteApprovalRule}>
                       <input type="hidden" name="id" value={r.id} />
-                      <button className="small danger" type="submit">Eliminar</button>
+                      <button className="small danger" type="submit" data-confirm="¿Eliminar esta regla de aprobación?">Eliminar</button>
                     </form>
                   </td>
                 </tr>

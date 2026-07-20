@@ -29,22 +29,22 @@ export default async function DashboardPage() {
     <>
       <h1>Panel de control</h1>
       <div className="grid cols-4">
-        <div className="card stat">
+        <Link className="card stat" href="/proveedores" style={{ color: 'inherit' }}>
           <div className="num">{suppliers}</div>
           <div className="label">Proveedores</div>
-        </div>
+        </Link>
         <div className="card stat">
           <div className="num" style={{ color: pendingFlags ? 'var(--danger)' : undefined }}>{pendingFlags}</div>
           <div className="label">Alertas BEC sin resolver</div>
         </div>
-        <div className="card stat">
+        <Link className="card stat" href="/facturas" style={{ color: 'inherit' }}>
           <div className="num">{invoicesPending}</div>
           <div className="label">Facturas en circuito</div>
-        </div>
-        <div className="card stat">
+        </Link>
+        <Link className="card stat" href="/facturas" style={{ color: 'inherit' }}>
           <div className="num">{invoicesPaid}</div>
           <div className="label">Facturas pagadas</div>
-        </div>
+        </Link>
       </div>
 
       {recentFlags.length > 0 && (

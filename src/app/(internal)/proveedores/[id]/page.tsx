@@ -304,7 +304,7 @@ export default async function SupplierDetailPage({
             <p className="muted">Revise la trazabilidad completa antes de aprobar.</p>
             <form action={finalApprove} className="inline">
               <input type="hidden" name="supplierId" value={supplier.id} />
-              <button type="submit">✓ Otorgar aprobación final</button>
+              <button type="submit" data-confirm="¿Confirma la APROBACIÓN FINAL de este proveedor? Quedará habilitado para facturar.">✓ Otorgar aprobación final</button>
             </form>
           </>
         )}
@@ -341,7 +341,7 @@ export default async function SupplierDetailPage({
             <form action={rejectSupplier} className="inline">
               <input type="hidden" name="supplierId" value={supplier.id} />
               <input name="reason" placeholder="Motivo del rechazo" required style={{ flex: 1 }} />
-              <button className="danger" type="submit">Rechazar</button>
+              <button className="danger" type="submit" data-confirm="¿Confirma el RECHAZO definitivo de este proveedor?">Rechazar</button>
             </form>
           </>
         )}

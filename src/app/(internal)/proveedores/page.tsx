@@ -6,9 +6,27 @@ import { Flash, StatusBadge } from '@/components/Alerts';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SuppliersPage({ searchParams }: { searchParams: { error?: string; ok?: string } }) {
+export default async function SuppliersPage({
+  searchParams,
+}: {
+  searchParams: { error?: string; ok?: string; q?: string; estado?: string; pais?: string };
+}) {
   const session = getSession();
+  const q = searchParams.q?.trim();
   const suppliers = await db.supplier.findMany({
+    where: {
+      ...(q
+        ? {
+            OR: [
+              { razonSocial: { contains: q, mode: 'insensitive' } },
+              { taxId: { contains: q } },
+              { email: { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(searchParams.estado ? { status: searchParams.estado } : {}),
+      ...(searchParams.pais ? { country: searchParams.pais } : {}),
+    },
     orderBy: { createdAt: 'desc' },
     include: { _count: { select: { redFlags: { where: { resolved: false } } } } },
   });
@@ -24,6 +42,27 @@ export default async function SuppliersPage({ searchParams }: { searchParams: { 
           </Link>
         </p>
       )}
+      <form className="inline card" style={{ padding: 12 }}>
+        <input name="q" placeholder="Buscar por razón social, Tax ID o email…" defaultValue={q} style={{ flex: 2, minWidth: 200 }} />
+        <select name="estado" defaultValue={searchParams.estado ?? ''}>
+          <option value="">Todos los estados</option>
+          {Object.entries(SUPPLIER_STATUS_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+        <select name="pais" defaultValue={searchParams.pais ?? ''}>
+          <option value="">Todos los países</option>
+          <option value="AR">Argentina</option>
+          <option value="UY">Uruguay</option>
+          <option value="US">Estados Unidos</option>
+        </select>
+        <button type="submit" className="secondary">Filtrar</button>
+        {(q || searchParams.estado || searchParams.pais) && (
+          <Link className="btn small" style={{ background: '#e8edf5', color: 'inherit' }} href="/proveedores">
+            Limpiar
+          </Link>
+        )}
+      </form>
       <div className="card">
         {suppliers.length === 0 ? (
           <p className="muted">Aún no hay proveedores registrados.</p>
