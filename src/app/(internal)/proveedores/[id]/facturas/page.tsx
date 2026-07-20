@@ -3,9 +3,11 @@ import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { getRolePerms } from '@/lib/permissions';
-import { approveInvoice, scheduleInvoice, startReview, uploadPaymentReceipt } from '@/lib/actions/invoices';
+import { approveInvoice, scheduleInvoice, startReview } from '@/lib/actions/invoices';
 import { INVOICE_FLOW, INVOICE_STATUS_LABELS, SUPPLIER_STATUS_LABELS, countryName } from '@/lib/countries';
 import { Flash, StatusBadge } from '@/components/Alerts';
+import { PaymentUpload } from '@/components/InvoiceActions';
+import { BatchReceipt } from '@/components/BatchReceipt';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +47,9 @@ export default async function SupplierInvoicesPage({
   const pagado = supplier.invoices.filter((i) => i.status === 'PAGADA').reduce((a, i) => a + i.amount, 0);
   const base = `/proveedores/${supplier.id}/facturas`;
 
+  // Facturas que Tesorería puede pagar en lote (aprobadas/programadas)
+  const pagables = supplier.invoices.filter((i) => ['APROBADA_PARA_PAGO', 'PROGRAMADA'].includes(i.status));
+
   return (
     <>
       <p>
@@ -77,6 +82,18 @@ export default async function SupplierInvoicesPage({
         </div>
       </div>
 
+      {can('PAGOS') && pagables.length > 0 && (
+        <BatchReceipt
+          supplierId={supplier.id}
+          invoices={pagables.map((i) => ({
+            id: i.id,
+            label: `${i.kind === 'NOTA_CREDITO' ? 'NC' : 'Factura'} ${i.number} — ${i.amount.toLocaleString('es-AR')} ${i.currency}`,
+            status: i.status,
+            statusLabel: INVOICE_STATUS_LABELS[i.status],
+          }))}
+        />
+      )}
+
       <div className="steps">
         <Link className={`step ${!estado ? 'current' : ''}`} href={base}>
           Todas ({supplier.invoices.length})
@@ -93,93 +110,81 @@ export default async function SupplierInvoicesPage({
           <p className="muted">No hay comprobantes {estado ? `en estado "${INVOICE_STATUS_LABELS[estado]}"` : ''}.</p>
         </div>
       ) : (
-        invoices.map((inv) => (
-          <div className="card" key={inv.id}>
-            <h2>
-              {inv.kind === 'NOTA_CREDITO' ? 'Nota de crédito' : inv.kind === 'RECIBO' ? 'Recibo' : 'Factura'}{' '}
-              {inv.number} <StatusBadge status={inv.status} labels={INVOICE_STATUS_LABELS} />
-            </h2>
-            <p className="muted">
-              Emisión: {inv.issueDate.toLocaleDateString('es-AR')}
-              {inv.dueDate ? ` · Vencimiento: ${inv.dueDate.toLocaleDateString('es-AR')}` : ''} · Monto:{' '}
-              <strong>
-                {inv.amount.toLocaleString('es-AR')} {inv.currency}
-              </strong>
-              {inv.approvals.length > 0 && <> · Aprobada por: {inv.approvals.map((a) => a.user.name).join(', ')}</>}
-            </p>
-            {(inv.documents.length > 0 || inv.documentLinks.length > 0) && (
-              <p>
-                Adjuntos:{' '}
-                {[...inv.documents, ...inv.documentLinks.map((l) => l.document)].map((d) => (
+        invoices.map((inv) => {
+          const pagos = [...inv.documents, ...inv.documentLinks.map((l) => l.document)].filter(
+            (d) => d.type === 'RECIBO_PAGO' || d.type === 'RETENCION',
+          );
+          const comprobantes = [...inv.documents, ...inv.documentLinks.map((l) => l.document)].filter(
+            (d) => d.type === 'FACTURA',
+          );
+          return (
+            <div className="card invoice-card" key={inv.id}>
+              <div className="invoice-head">
+                <div>
+                  <h2 style={{ margin: 0 }}>
+                    {inv.kind === 'NOTA_CREDITO' ? 'Nota de crédito' : inv.kind === 'RECIBO' ? 'Recibo' : 'Factura'}{' '}
+                    {inv.number}
+                  </h2>
+                  <p className="muted" style={{ margin: '4px 0 0' }}>
+                    Emisión: {inv.issueDate.toLocaleDateString('es-AR')}
+                    {inv.dueDate ? ` · Vence: ${inv.dueDate.toLocaleDateString('es-AR')}` : ''}
+                    {inv.approvals.length > 0 && ` · Aprobó: ${inv.approvals.map((a) => a.user.name).join(', ')}`}
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 18, fontWeight: 700 }}>
+                    {inv.amount.toLocaleString('es-AR')} {inv.currency}
+                  </div>
+                  <StatusBadge status={inv.status} labels={INVOICE_STATUS_LABELS} />
+                </div>
+              </div>
+
+              <p style={{ margin: '10px 0 0', fontSize: 13 }}>
+                {comprobantes.map((d) => (
                   <span key={d.id} style={{ marginRight: 12 }}>
-                    <a href={`/api/files/${d.id}`}>{d.filename}</a> <span className="badge">{d.type}</span>
+                    📄 <a href={`/api/files/${d.id}`}>{d.filename}</a>
+                  </span>
+                ))}
+                {pagos.map((d) => (
+                  <span key={d.id} style={{ marginRight: 12 }}>
+                    <a href={`/api/files/${d.id}`}>⬇ {d.filename}</a>{' '}
+                    <span className="badge">{d.type === 'RETENCION' ? 'Retención' : 'Recibo'}</span>
                   </span>
                 ))}
               </p>
-            )}
 
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {inv.status === 'RECIBIDA' && can('FACTURA_REVISION') && (
-                <form action={startReview}>
-                  <input type="hidden" name="invoiceId" value={inv.id} />
-                  <button className="small" type="submit">Pasar a revisión</button>
-                </form>
-              )}
-              {inv.status === 'EN_REVISION' && can('FACTURA_APROBACION') && (
-                <form action={approveInvoice}>
-                  <input type="hidden" name="invoiceId" value={inv.id} />
-                  <button className="small" type="submit">Aprobar para pago</button>
-                </form>
-              )}
-              {inv.status === 'APROBADA_PARA_PAGO' && can('PAGOS') && (
-                <form action={scheduleInvoice}>
-                  <input type="hidden" name="invoiceId" value={inv.id} />
-                  <button className="small" type="submit">Programar pago</button>
-                </form>
-              )}
+              <div className="invoice-actions">
+                {inv.status === 'RECIBIDA' && can('FACTURA_REVISION') && (
+                  <form action={startReview}>
+                    <input type="hidden" name="invoiceId" value={inv.id} />
+                    <button className="small" type="submit">Pasar a revisión</button>
+                  </form>
+                )}
+                {inv.status === 'EN_REVISION' && can('FACTURA_APROBACION') && (
+                  <form action={approveInvoice}>
+                    <input type="hidden" name="invoiceId" value={inv.id} />
+                    <button className="small" type="submit">✓ Aprobar para pago</button>
+                  </form>
+                )}
+                {inv.status === 'APROBADA_PARA_PAGO' && can('PAGOS') && (
+                  <form action={scheduleInvoice}>
+                    <input type="hidden" name="invoiceId" value={inv.id} />
+                    <button className="small" type="submit">📅 Programar pago</button>
+                  </form>
+                )}
+                {['PROGRAMADA', 'PAGADA'].includes(inv.status) && can('PAGOS') && (
+                  <PaymentUpload
+                    supplierId={supplier.id}
+                    invoiceId={inv.id}
+                    invoiceNumber={inv.number}
+                    canMarkPaid={inv.status === 'PROGRAMADA'}
+                  />
+                )}
+                {inv.status === 'PAGADA' && <span className="badge ok">✓ Pagada</span>}
+              </div>
             </div>
-
-          </div>
-        ))
-      )}
-
-      {can('PAGOS') && supplier.invoices.some((i) => ['PROGRAMADA', 'PAGADA'].includes(i.status)) && (
-        <div className="card">
-          <h2>Subir comprobante de pago / retención (Tesorería)</h2>
-          <p className="muted">
-            Un mismo comprobante puede cubrir varias facturas: seleccione todas las que corresponda.
-          </p>
-          <form action={uploadPaymentReceipt} className="stack" style={{ maxWidth: 560 }}>
-            <input type="hidden" name="supplierId" value={supplier.id} />
-            <fieldset style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
-              <legend className="muted" style={{ padding: '0 6px' }}>Facturas que cubre el comprobante</legend>
-              {supplier.invoices
-                .filter((i) => ['PROGRAMADA', 'PAGADA'].includes(i.status))
-                .map((i) => (
-                  <label key={i.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, fontWeight: 400 }}>
-                    <input type="checkbox" name="invoiceIds" value={i.id} />
-                    {i.kind === 'NOTA_CREDITO' ? 'NC' : 'Factura'} {i.number} — {i.amount.toLocaleString('es-AR')} {i.currency}{' '}
-                    <StatusBadge status={i.status} labels={INVOICE_STATUS_LABELS} />
-                  </label>
-                ))}
-            </fieldset>
-            <label>
-              Tipo de comprobante
-              <select name="type">
-                <option value="RECIBO_PAGO">Recibo de pago</option>
-                <option value="RETENCION">Certificado de retención</option>
-              </select>
-            </label>
-            <label>
-              Archivo
-              <input type="file" name="file" required />
-            </label>
-            <label style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <input type="checkbox" name="markPaid" /> Marcar como pagadas las facturas programadas seleccionadas
-            </label>
-            <button type="submit">Subir comprobante</button>
-          </form>
-        </div>
+          );
+        })
       )}
     </>
   );

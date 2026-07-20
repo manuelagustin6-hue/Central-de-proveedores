@@ -191,14 +191,13 @@ check('Segunda aprobación completa el umbral', (await compras.page.content()).i
 // 9. Tesorería programa y paga con recibo
 await tes.page.goto(`${supplierUrl}/facturas`);
 await act(tes.page, 'text=Programar pago');
-// Comprobante que cubre facturas seleccionadas (multi-factura)
-await tes.page.check('input[name=invoiceIds]');
+// Cargar comprobante inline en la factura y marcarla pagada
+await tes.page.click('button:has-text("Cargar comprobante de pago")');
 await tes.page.setInputFiles('input[name=file]', {
   name: 'recibo.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 recibo'),
 });
-await tes.page.check('input[name=markPaid]');
-await act(tes.page, 'button:has-text("Subir comprobante")');
-check('Factura pagada con recibo multi-factura', (await tes.page.content()).includes('marcada(s) como pagada(s)'));
+await act(tes.page, 'button:has-text("Guardar comprobante")');
+check('Factura pagada con comprobante inline', (await tes.page.content()).includes('marcada(s) como pagada(s)'));
 
 // 10. Proveedor descarga el recibo desde su portal
 await pp.goto(`${BASE}/portal/${token}?tab=facturas`);

@@ -1,12 +1,16 @@
 import { login } from '@/lib/actions/auth';
 import { Flash } from '@/components/Alerts';
+import { Logo } from '@/components/Logo';
 
 export default function LoginPage({ searchParams }: { searchParams: { error?: string } }) {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <h1 style={{ marginTop: 0 }}>Central de Proveedores</h1>
-        <p className="muted">Gestión de proveedores y control anti-fraude (BEC)</p>
+        <div style={{ textAlign: 'center', marginBottom: 12 }}>
+          <Logo size={64} color="#333333" />
+          <h1 style={{ margin: '10px 0 0' }}>HA Proveedores</h1>
+        </div>
+        <p className="muted" style={{ textAlign: 'center' }}>Gestión de proveedores y control anti-fraude (BEC)</p>
         <Flash searchParams={searchParams} />
         <form action={login} className="stack" style={{ maxWidth: 'none' }}>
           <label>

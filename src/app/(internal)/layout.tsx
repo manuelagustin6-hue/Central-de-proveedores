@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { logout } from '@/lib/actions/auth';
 import { NavLinks } from '@/components/NavLinks';
+import { Logo } from '@/components/Logo';
 import { getRolePerms } from '@/lib/permissions';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -20,7 +21,10 @@ export default async function InternalLayout({ children }: { children: React.Rea
   return (
     <>
       <header className="topbar">
-        <span className="brand">Central de Proveedores</span>
+        <span className="brand" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <Logo size={30} color="#ffffff" />
+          HA Proveedores
+        </span>
         <nav>
           <NavLinks
             links={[
