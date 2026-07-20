@@ -1,12 +1,15 @@
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { getRolePerms } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AuditPage({ searchParams }: { searchParams: { q?: string } }) {
   const session = getSession();
-  if (session?.role !== 'AUDITORIA' && session?.role !== 'ADMIN') redirect('/dashboard');
+  if (!session) redirect('/login');
+  const perms = await getRolePerms(session.role);
+  if (!perms.has('VER_AUDITORIA')) redirect('/dashboard');
 
   const q = searchParams.q?.trim();
   const logs = await db.auditLog.findMany({

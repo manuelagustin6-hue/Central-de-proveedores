@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { db } from '../db';
-import { requireRole } from '../auth';
+import { requirePermission } from '../permissions';
 import { audit, assertSegregation } from '../audit';
 import { checkTyposquatting, normalizePhone, raiseRedFlag } from '../bec';
 import { missingRequiredDocs, validateTaxId } from '../countries';
@@ -22,7 +22,7 @@ export async function createSupplier(formData: FormData) {
   let id = '';
   let error = '';
   try {
-    const session = requireRole('COMPRAS');
+    const session = await requirePermission('PROVEEDOR_ALTA');
     const country = String(formData.get('country'));
     const razonSocial = String(formData.get('razonSocial') ?? '').trim();
     const email = String(formData.get('email') ?? '').trim() || null;
@@ -80,7 +80,7 @@ export async function registerPhoneValidation(formData: FormData) {
   const supplierId = String(formData.get('supplierId'));
   const path = `/proveedores/${supplierId}`;
   try {
-    const session = requireRole('VALIDACION');
+    const session = await requirePermission('VALIDACION_TELEFONICA');
     const phone = String(formData.get('phoneIndependent') ?? '').trim();
     const source = String(formData.get('phoneSource') ?? '').trim();
     if (!phone || !source) throw new Error('Debe indicar teléfono y fuente independiente');
@@ -151,7 +151,7 @@ export async function registerTestTransfer(formData: FormData) {
   const supplierId = String(formData.get('supplierId'));
   const path = `/proveedores/${supplierId}`;
   try {
-    const session = requireRole('TESORERIA');
+    const session = await requirePermission('TRANSFERENCIA_PRUEBA');
     const amount = parseFloat(String(formData.get('amount')));
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('Monto inválido');
 
@@ -194,7 +194,7 @@ export async function confirmTestTransfer(formData: FormData) {
   const supplierId = String(formData.get('supplierId'));
   const path = `/proveedores/${supplierId}`;
   try {
-    const session = requireRole('TESORERIA');
+    const session = await requirePermission('TRANSFERENCIA_PRUEBA');
     const supplier = await db.supplier.findUniqueOrThrow({ where: { id: supplierId } });
     if (supplier.status !== 'PRUEBA_ENVIADA') throw new Error('No hay transferencia de prueba pendiente de confirmar');
     await assertSegregation(supplierId, session);
@@ -230,7 +230,7 @@ export async function finalApprove(formData: FormData) {
   const supplierId = String(formData.get('supplierId'));
   const path = `/proveedores/${supplierId}`;
   try {
-    const session = requireRole('AUDITORIA');
+    const session = await requirePermission('APROBACION_FINAL');
     const supplier = await db.supplier.findUniqueOrThrow({ where: { id: supplierId } });
     if (supplier.status !== 'PRUEBA_CONFIRMADA') {
       throw new Error('La aprobación final requiere la transferencia de prueba confirmada (no se pueden saltar pasos del protocolo)');
@@ -274,7 +274,7 @@ export async function requestCorrections(formData: FormData) {
   const supplierId = String(formData.get('supplierId'));
   const path = `/proveedores/${supplierId}`;
   try {
-    const session = requireRole('AUDITORIA');
+    const session = await requirePermission('APROBACION_FINAL');
     const note = String(formData.get('note') ?? '').trim();
     if (!note) throw new Error('Debe detallar las correcciones solicitadas');
 
@@ -314,7 +314,7 @@ export async function rejectSupplier(formData: FormData) {
   const supplierId = String(formData.get('supplierId'));
   const path = `/proveedores/${supplierId}`;
   try {
-    const session = requireRole('AUDITORIA');
+    const session = await requirePermission('APROBACION_FINAL');
     const reason = String(formData.get('reason') ?? '').trim();
     if (!reason) throw new Error('Debe indicar el motivo del rechazo');
     await db.supplier.update({ where: { id: supplierId }, data: { status: 'RECHAZADO' } });
@@ -339,7 +339,7 @@ export async function resolveRedFlag(formData: FormData) {
   const supplierId = String(formData.get('supplierId'));
   const path = `/proveedores/${supplierId}`;
   try {
-    const session = requireRole('AUDITORIA');
+    const session = await requirePermission('APROBACION_FINAL');
     const note = String(formData.get('note') ?? '').trim();
     if (!note) throw new Error('Debe indicar cómo se verificó/resolvió la alerta');
     await db.redFlag.update({ where: { id: flagId }, data: { resolved: true } });
@@ -362,7 +362,7 @@ export async function uploadInternalDocument(formData: FormData) {
   const supplierId = String(formData.get('supplierId'));
   const path = `/proveedores/${supplierId}`;
   try {
-    const session = requireRole('COMPRAS');
+    const session = await requirePermission('PROVEEDOR_ALTA');
     const file = formData.get('file') as File | null;
     const type = String(formData.get('type') ?? 'OTRO');
     if (!file || file.size === 0) throw new Error('Debe seleccionar un archivo');

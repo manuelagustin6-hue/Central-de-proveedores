@@ -30,6 +30,23 @@ async function main() {
     console.log(`Ya existen ${existingUsers} usuarios; no se crean nuevos.`);
   }
 
+  // Permisos por defecto de cada rol (solo si la tabla está vacía)
+  const permsCount = await db.rolePermission.count();
+  if (permsCount === 0) {
+    const defaults: Record<string, string[]> = {
+      COMPRAS: ['PROVEEDOR_ALTA', 'FACTURA_REVISION', 'FACTURA_APROBACION'],
+      VALIDACION: ['VALIDACION_TELEFONICA'],
+      TESORERIA: ['TRANSFERENCIA_PRUEBA', 'PAGOS'],
+      AUDITORIA: ['APROBACION_FINAL', 'FACTURA_REVISION', 'FACTURA_APROBACION', 'VER_AUDITORIA'],
+    };
+    for (const [role, perms] of Object.entries(defaults)) {
+      for (const permission of perms) {
+        await db.rolePermission.create({ data: { role, permission } });
+      }
+    }
+    console.log('Permisos por defecto asignados a los roles.');
+  }
+
   // Regla de doble aprobación de ejemplo: montos >= 1.000.000 requieren 2 aprobaciones
   const rulesCount = await db.approvalRule.count();
   if (rulesCount === 0) {

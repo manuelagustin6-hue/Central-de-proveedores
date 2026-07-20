@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { db } from '../db';
-import { requireRole } from '../auth';
+import { requirePermission } from '../permissions';
 import { audit } from '../audit';
 import { encryptFile, MAX_FILE_MSG, MAX_FILE_SIZE } from '../files';
 import { sendNotification } from '../notify';
@@ -18,7 +18,7 @@ export async function startReview(formData: FormData) {
   const invoiceId = String(formData.get('invoiceId'));
   let path = '/facturas';
   try {
-    const session = requireRole('COMPRAS', 'AUDITORIA');
+    const session = await requirePermission('FACTURA_REVISION');
     const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
     path = `/proveedores/${invoice.supplierId}/facturas`;
     if (invoice.status !== 'RECIBIDA') throw new Error('La factura no está en estado Recibida');
@@ -46,7 +46,7 @@ export async function approveInvoice(formData: FormData) {
   let okMsg = 'Factura aprobada para pago';
   let path = '/facturas';
   try {
-    const session = requireRole('AUDITORIA', 'COMPRAS');
+    const session = await requirePermission('FACTURA_APROBACION');
     const invoice = await db.invoice.findUniqueOrThrow({
       where: { id: invoiceId },
       include: { supplier: true, approvals: true },
@@ -97,7 +97,7 @@ export async function scheduleInvoice(formData: FormData) {
   const invoiceId = String(formData.get('invoiceId'));
   let path = '/facturas';
   try {
-    const session = requireRole('TESORERIA');
+    const session = await requirePermission('PAGOS');
     const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
     path = `/proveedores/${invoice.supplierId}/facturas`;
     if (invoice.status !== 'APROBADA_PARA_PAGO') throw new Error('La factura debe estar Aprobada para pago');
@@ -116,62 +116,87 @@ export async function scheduleInvoice(formData: FormData) {
   backTo(path, undefined, 'Pago programado');
 }
 
-/** Tesorería: sube el recibo de pago / certificado de retención y marca la factura como pagada. */
+/**
+ * Tesorería: sube un recibo de pago / certificado de retención que puede
+ * cubrir una o varias facturas del proveedor, y opcionalmente marca como
+ * pagadas las facturas programadas seleccionadas.
+ */
 export async function uploadPaymentReceipt(formData: FormData) {
-  const invoiceId = String(formData.get('invoiceId'));
-  let path = '/facturas';
+  const supplierId = String(formData.get('supplierId'));
+  const path = `/proveedores/${supplierId}/facturas`;
+  let okMsg = 'Comprobante cargado';
   try {
-    const session = requireRole('TESORERIA');
+    const session = await requirePermission('PAGOS');
     const type = String(formData.get('type') ?? 'RECIBO_PAGO');
     const markPaid = formData.get('markPaid') === 'on';
     const file = formData.get('file') as File | null;
+    const invoiceIds = formData.getAll('invoiceIds').map(String).filter(Boolean);
+
     if (!file || file.size === 0) throw new Error('Debe seleccionar un archivo');
     if (file.size > MAX_FILE_SIZE) throw new Error(MAX_FILE_MSG);
+    if (invoiceIds.length === 0) throw new Error('Debe seleccionar al menos una factura');
 
-    const invoice = await db.invoice.findUniqueOrThrow({
-      where: { id: invoiceId },
+    const invoices = await db.invoice.findMany({
+      where: { id: { in: invoiceIds }, supplierId },
       include: { supplier: true },
     });
-    path = `/proveedores/${invoice.supplierId}/facturas`;
+    if (invoices.length !== invoiceIds.length) {
+      throw new Error('Alguna de las facturas seleccionadas no pertenece a este proveedor');
+    }
+
     const doc = await db.document.create({
       data: {
-        supplierId: invoice.supplierId,
-        invoiceId,
+        supplierId,
         type,
         filename: file.name,
         data: encryptFile(Buffer.from(await file.arrayBuffer())),
         mimeType: file.type || 'application/octet-stream',
         size: file.size,
         uploadedBy: session.email,
+        invoiceLinks: { create: invoiceIds.map((invoiceId) => ({ invoiceId })) },
       },
     });
+
+    const numbers = invoices.map((i) => i.number).join(', ');
+    let paidCount = 0;
     if (markPaid) {
-      if (invoice.status !== 'PROGRAMADA') throw new Error('Solo se puede marcar como pagada una factura Programada');
-      await db.invoice.update({ where: { id: invoiceId }, data: { status: 'PAGADA' } });
+      const programadas = invoices.filter((i) => i.status === 'PROGRAMADA');
+      if (programadas.length === 0) {
+        throw new Error('Ninguna de las facturas seleccionadas está Programada para marcar como pagada');
+      }
+      await db.invoice.updateMany({
+        where: { id: { in: programadas.map((i) => i.id) } },
+        data: { status: 'PAGADA' },
+      });
+      paidCount = programadas.length;
+      okMsg = `Comprobante cargado y ${paidCount} factura(s) marcada(s) como pagada(s)`;
     }
+
     await audit({
       session,
       action: markPaid ? 'FACTURA_PAGADA' : 'CARGA_COMPROBANTE_PAGO',
       entityType: 'Document',
       entityId: doc.id,
-      supplierId: invoice.supplierId,
-      detail: `${type}: ${file.name} (factura ${invoice.number})`,
+      supplierId,
+      detail: `${type}: ${file.name} (facturas: ${numbers})`,
     });
-    if (invoice.supplier.email) {
+
+    const supplier = invoices[0].supplier;
+    if (supplier.email) {
       await sendNotification(
-        invoice.supplier.email,
+        supplier.email,
         markPaid
-          ? `Su factura ${invoice.number} fue pagada`
-          : `Nuevo comprobante disponible para su factura ${invoice.number}`,
+          ? `Pago registrado de ${paidCount} factura(s)`
+          : 'Nuevo comprobante disponible en su portal',
         `Estimado proveedor:\n\n${
           markPaid
-            ? `Registramos el pago de su factura ${invoice.number} por ${invoice.amount} ${invoice.currency}.`
-            : `Hay un nuevo comprobante disponible para su factura ${invoice.number}.`
-        }\nPuede descargar el comprobante desde su portal:\n${getBaseUrl()}/portal/${invoice.supplier.accessToken}\n\nGracias.`,
+            ? `Registramos el pago de las siguientes facturas: ${numbers}.`
+            : `Hay un nuevo comprobante disponible para las facturas: ${numbers}.`
+        }\nPuede descargar el comprobante desde su portal:\n${getBaseUrl()}/portal/${supplier.accessToken}\n\nGracias.`,
       );
     }
   } catch (e) {
     backTo(path, e instanceof Error ? e.message : 'Error inesperado');
   }
-  backTo(path, undefined, 'Comprobante cargado');
+  backTo(path, undefined, okMsg);
 }

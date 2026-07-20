@@ -6,6 +6,8 @@ import { db } from '../db';
 import { requireRole, requireSession } from '../auth';
 import { audit } from '../audit';
 
+import { CONFIGURABLE_ROLES, PERMISSIONS } from '../permissions';
+
 const ROLES = ['COMPRAS', 'VALIDACION', 'TESORERIA', 'AUDITORIA', 'ADMIN'];
 
 function backTo(path: string, error?: string, ok?: string): never {
@@ -127,6 +129,33 @@ export async function adminResetPassword(formData: FormData) {
     backTo('/usuarios', e instanceof Error ? e.message : 'Error inesperado');
   }
   backTo('/usuarios', undefined, 'Contraseña actualizada');
+}
+
+/** Admin: guarda la matriz de permisos por rol. */
+export async function saveRolePermissions(formData: FormData) {
+  try {
+    const session = requireRole('ADMIN');
+    const valid = new Set(PERMISSIONS.map((p) => p.key));
+    const rows: { role: string; permission: string }[] = [];
+    for (const role of CONFIGURABLE_ROLES) {
+      for (const value of formData.getAll(`perm-${role}`).map(String)) {
+        if (valid.has(value)) rows.push({ role, permission: value });
+      }
+    }
+    await db.$transaction([
+      db.rolePermission.deleteMany({ where: { role: { in: CONFIGURABLE_ROLES } } }),
+      db.rolePermission.createMany({ data: rows }),
+    ]);
+    await audit({
+      session,
+      action: 'CAMBIO_PERMISOS_ROLES',
+      entityType: 'RolePermission',
+      detail: rows.map((r) => `${r.role}:${r.permission}`).join(', ') || 'sin permisos',
+    });
+  } catch (e) {
+    backTo('/usuarios', e instanceof Error ? e.message : 'Error inesperado');
+  }
+  backTo('/usuarios', undefined, 'Permisos por rol actualizados');
 }
 
 /** Cualquier usuario: cambia su propia contraseña verificando la actual. */

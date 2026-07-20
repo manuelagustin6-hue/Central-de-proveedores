@@ -21,6 +21,7 @@ import {
   countryName,
 } from '@/lib/countries';
 import { getBaseUrl } from '@/lib/urls';
+import { getRolePerms } from '@/lib/permissions';
 import { Flash, StatusBadge } from '@/components/Alerts';
 import { CopyButton } from '@/components/CopyButton';
 
@@ -90,7 +91,8 @@ export default async function SupplierDetailPage({
   const currentIdx = FLOW.indexOf(supplier.status);
   const portalUrl = `${getBaseUrl()}/portal/${supplier.accessToken}`;
 
-  const can = (r: string) => role === r || role === 'ADMIN';
+  const perms = await getRolePerms(role);
+  const can = (perm: string) => perms.has(perm);
 
   const ROLE_NAMES: Record<string, string> = {
     VALIDACION: 'Validación Datos',
@@ -125,7 +127,7 @@ export default async function SupplierDetailPage({
       {pendingFlags.map((f) => (
         <div key={f.id} className="alert redflag">
           🚩 {f.message}
-          {can('AUDITORIA') && (
+          {can('APROBACION_FINAL') && (
             <form action={resolveRedFlag} className="inline" style={{ marginTop: 8 }}>
               <input type="hidden" name="flagId" value={f.id} />
               <input type="hidden" name="supplierId" value={supplier.id} />
@@ -235,7 +237,7 @@ export default async function SupplierDetailPage({
           </p>
         )}
 
-        {can('VALIDACION') && supplier.status === 'DATOS_CARGADOS' && (
+        {can('VALIDACION_TELEFONICA') && supplier.status === 'DATOS_CARGADOS' && (
           <>
             <h3>1. Validación telefónica (rol Validación Datos)</h3>
             <p className="muted">
@@ -258,7 +260,7 @@ export default async function SupplierDetailPage({
           </>
         )}
 
-        {can('TESORERIA') && supplier.status === 'VALIDADO_TELEFONICAMENTE' && (
+        {can('TRANSFERENCIA_PRUEBA') && supplier.status === 'VALIDADO_TELEFONICAMENTE' && (
           <>
             <h3>2. Transferencia de prueba (rol Tesorería)</h3>
             <form action={registerTestTransfer} className="stack">
@@ -280,7 +282,7 @@ export default async function SupplierDetailPage({
           </>
         )}
 
-        {can('TESORERIA') && supplier.status === 'PRUEBA_ENVIADA' && (
+        {can('TRANSFERENCIA_PRUEBA') && supplier.status === 'PRUEBA_ENVIADA' && (
           <>
             <h3>3. Confirmación verbal de la transferencia (rol Tesorería)</h3>
             <p className="muted">
@@ -298,7 +300,7 @@ export default async function SupplierDetailPage({
           </>
         )}
 
-        {can('AUDITORIA') && supplier.status === 'PRUEBA_CONFIRMADA' && (
+        {can('APROBACION_FINAL') && supplier.status === 'PRUEBA_CONFIRMADA' && (
           <>
             <h3>4. Aprobación final (rol Auditoría)</h3>
             <p className="muted">Revise la trazabilidad completa antes de aprobar.</p>
@@ -317,7 +319,7 @@ export default async function SupplierDetailPage({
           </p>
         )}
 
-        {can('AUDITORIA') &&
+        {can('APROBACION_FINAL') &&
           ['DATOS_CARGADOS', 'VALIDADO_TELEFONICAMENTE', 'PRUEBA_ENVIADA', 'PRUEBA_CONFIRMADA'].includes(
             supplier.status,
           ) && (
@@ -335,7 +337,7 @@ export default async function SupplierDetailPage({
             </>
           )}
 
-        {can('AUDITORIA') && !['APROBADO', 'RECHAZADO'].includes(supplier.status) && (
+        {can('APROBACION_FINAL') && !['APROBADO', 'RECHAZADO'].includes(supplier.status) && (
           <>
             <h3>Rechazar proveedor (rol Auditoría)</h3>
             <form action={rejectSupplier} className="inline">
@@ -403,7 +405,7 @@ export default async function SupplierDetailPage({
             </tbody>
           </table>
         )}
-        {can('COMPRAS') && (
+        {can('PROVEEDOR_ALTA') && (
           <>
             <h3>Cargar documentación fiscal/societaria</h3>
             <form action={uploadInternalDocument} className="inline">

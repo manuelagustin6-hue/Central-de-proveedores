@@ -1,7 +1,14 @@
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { adminResetPassword, createUser, setUserRole, toggleUserActive } from '@/lib/actions/users';
+import {
+  adminResetPassword,
+  createUser,
+  saveRolePermissions,
+  setUserRole,
+  toggleUserActive,
+} from '@/lib/actions/users';
+import { CONFIGURABLE_ROLES, PERMISSIONS } from '@/lib/permissions';
 import { Flash } from '@/components/Alerts';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +25,11 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
   const session = getSession();
   if (session?.role !== 'ADMIN') redirect('/dashboard');
 
-  const users = await db.user.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }] });
+  const [users, rolePerms] = await Promise.all([
+    db.user.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }] }),
+    db.rolePermission.findMany(),
+  ]);
+  const permsByRole = new Set(rolePerms.map((r) => `${r.role}:${r.permission}`));
 
   return (
     <>
@@ -29,6 +40,54 @@ export default async function UsersPage({ searchParams }: { searchParams: { erro
         persona por rol, y dos personas distintas en Tesorería (una envía la transferencia de prueba y
         otra la confirma).
       </p>
+
+      <div className="card">
+        <h2>Permisos por rol</h2>
+        <p className="muted">
+          Defina qué puede hacer cada rol. El rol Administrador siempre tiene todos los permisos. Los
+          cambios rigen de inmediato para todos los usuarios del rol.
+        </p>
+        <form action={saveRolePermissions}>
+          <table>
+            <thead>
+              <tr>
+                <th>Permiso</th>
+                <th style={{ textAlign: 'center' }}>Compras</th>
+                <th style={{ textAlign: 'center' }}>Validación</th>
+                <th style={{ textAlign: 'center' }}>Tesorería</th>
+                <th style={{ textAlign: 'center' }}>Auditoría</th>
+              </tr>
+            </thead>
+            <tbody>
+              {PERMISSIONS.map((p) => (
+                <tr key={p.key}>
+                  <td>{p.label}</td>
+                  {CONFIGURABLE_ROLES.map((role) => (
+                    <td key={role} style={{ textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        name={`perm-${role}`}
+                        value={p.key}
+                        defaultChecked={permsByRole.has(`${role}:${p.key}`)}
+                        aria-label={`${role}: ${p.label}`}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p style={{ marginTop: 12 }}>
+            <button type="submit" data-confirm="¿Guardar los cambios de permisos? Rigen de inmediato para todos los usuarios.">
+              Guardar permisos
+            </button>
+          </p>
+        </form>
+        <p className="muted">
+          Nota: la segregación de funciones (ninguna persona puede ejecutar dos pasos consecutivos
+          sobre el mismo proveedor) se aplica siempre, sin importar los permisos.
+        </p>
+      </div>
 
       <div className="card">
         <h2>Crear usuario</h2>

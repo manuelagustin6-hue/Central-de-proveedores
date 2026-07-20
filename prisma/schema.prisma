@@ -113,8 +113,20 @@ model Document {
   uploadedBy String // email de usuario interno o "proveedor"
   createdAt  DateTime @default(now())
 
-  supplier Supplier @relation(fields: [supplierId], references: [id])
-  invoice  Invoice? @relation(fields: [invoiceId], references: [id])
+  supplier     Supplier          @relation(fields: [supplierId], references: [id])
+  invoice      Invoice?          @relation(fields: [invoiceId], references: [id])
+  invoiceLinks DocumentInvoice[]
+}
+
+// Un comprobante de pago/retención puede cubrir varias facturas
+model DocumentInvoice {
+  documentId String
+  invoiceId  String
+
+  document Document @relation(fields: [documentId], references: [id])
+  invoice  Invoice  @relation(fields: [invoiceId], references: [id])
+
+  @@id([documentId, invoiceId])
 }
 
 // Comprobantes: flujo RECIBIDA -> EN_REVISION -> APROBADA_PARA_PAGO -> PROGRAMADA -> PAGADA
@@ -131,9 +143,10 @@ model Invoice {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  supplier  Supplier          @relation(fields: [supplierId], references: [id])
-  documents Document[]
-  approvals InvoiceApproval[]
+  supplier      Supplier          @relation(fields: [supplierId], references: [id])
+  documents     Document[]
+  documentLinks DocumentInvoice[]
+  approvals     InvoiceApproval[]
 }
 
 // Doble aprobación: aprobaciones individuales sobre una factura
@@ -147,6 +160,15 @@ model InvoiceApproval {
   user    User    @relation(fields: [userId], references: [id])
 
   @@unique([invoiceId, userId])
+}
+
+// Permisos asignados a cada rol (configurables por el Admin desde /usuarios)
+model RolePermission {
+  id         String @id @default(cuid())
+  role       String
+  permission String
+
+  @@unique([role, permission])
 }
 
 // Umbrales de doble aprobación por país

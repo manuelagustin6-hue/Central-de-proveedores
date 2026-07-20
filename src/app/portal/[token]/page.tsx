@@ -68,7 +68,10 @@ export default async function PortalPage({
     }),
     db.invoice.findMany({
       where: { supplierId: supplier.id },
-      include: { documents: true },
+      include: {
+        documents: { select: { id: true, filename: true, type: true } },
+        documentLinks: { include: { document: { select: { id: true, filename: true, type: true } } } },
+      },
       orderBy: { createdAt: 'desc' },
     }),
   ]);
@@ -462,16 +465,19 @@ export default async function PortalPage({
                         <td>{inv.amount.toLocaleString('es-AR')} {inv.currency}</td>
                         <td><StatusBadge status={inv.status} labels={INVOICE_STATUS_LABELS} /></td>
                         <td>
-                          {inv.documents.filter((d) => d.type === 'RECIBO_PAGO' || d.type === 'RETENCION').length === 0
-                            ? '—'
-                            : inv.documents
-                                .filter((d) => d.type === 'RECIBO_PAGO' || d.type === 'RETENCION')
-                                .map((d) => (
+                          {(() => {
+                            const pagos = [...inv.documents, ...inv.documentLinks.map((l) => l.document)].filter(
+                              (d) => d.type === 'RECIBO_PAGO' || d.type === 'RETENCION',
+                            );
+                            return pagos.length === 0
+                              ? '—'
+                              : pagos.map((d) => (
                                   <div key={d.id}>
                                     <a href={`/api/files/${d.id}?token=${token}`}>⬇ {d.filename}</a>{' '}
                                     <span className="badge">{d.type === 'RETENCION' ? 'Retención' : 'Recibo'}</span>
                                   </div>
-                                ))}
+                                ));
+                          })()}
                         </td>
                       </tr>
                     ))}
