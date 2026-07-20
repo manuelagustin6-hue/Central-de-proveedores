@@ -1,12 +1,8 @@
 import Link from 'next/link';
 import { db } from '@/lib/db';
 import { getSupplierByToken } from '@/lib/auth';
-import {
-  createInvoice,
-  saveBankData,
-  updateSupplierData,
-  uploadSupplierDocument,
-} from '@/lib/actions/portal';
+import { saveBankData, updateSupplierData, uploadSupplierDocument } from '@/lib/actions/portal';
+import { InvoiceUploadForm } from '@/components/InvoiceUploadForm';
 import {
   COUNTRIES,
   Country,
@@ -389,42 +385,13 @@ export default async function PortalPage({
                   Podrá cargar facturas cuando su alta esté aprobada por nuestro equipo de verificación.
                 </p>
               ) : (
-                <form action={createInvoice} className="stack">
-                  <input type="hidden" name="token" value={token} />
-                  <label>
-                    Tipo de comprobante
-                    <select name="kind">
-                      <option value="FACTURA">Factura</option>
-                      <option value="NOTA_CREDITO">Nota de crédito</option>
-                      <option value="RECIBO">Recibo</option>
-                    </select>
-                  </label>
-                  <label>
-                    Número de comprobante
-                    <input name="number" required placeholder="0001-00001234" />
-                  </label>
-                  <label>
-                    Fecha de emisión
-                    <input type="date" name="issueDate" required />
-                  </label>
-                  <label>
-                    Fecha de vencimiento
-                    <input type="date" name="dueDate" />
-                  </label>
-                  <label>
-                    Monto
-                    <input type="number" step="0.01" name="amount" required />
-                  </label>
-                  <label>
-                    Moneda
-                    <input name="currency" defaultValue={country.currency} required />
-                  </label>
-                  <label>
-                    Archivo (PDF o XML)
-                    <input type="file" name="file" accept=".pdf,.xml" required />
-                  </label>
-                  <button type="submit">Enviar comprobante</button>
-                </form>
+                <>
+                  <p className="muted">
+                    Si adjunta el <strong>XML</strong> de la factura electrónica, el sistema completa
+                    automáticamente número, fecha, monto y moneda para que solo los confirme.
+                  </p>
+                  <InvoiceUploadForm token={token} defaultCurrency={country.currency} />
+                </>
               )}
             </div>
 

@@ -25,7 +25,7 @@ export function BatchReceipt({ supplierId, invoices }: { supplierId: string; inv
 
   if (!open) {
     return (
-      <div className="card" style={{ background: '#f7f3f1', borderColor: '#e3d8d2' }}>
+      <div className="card" style={{ background: '#f4f4f4', borderColor: '#e0e0e0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <strong>Pago en lote</strong>
@@ -44,7 +44,7 @@ export function BatchReceipt({ supplierId, invoices }: { supplierId: string; inv
   const selectedPagables = invoices.filter((i) => sel.has(i.id) && i.status === 'PROGRAMADA').length;
 
   return (
-    <form action={uploadPaymentReceipt} className="card" style={{ background: '#f7f3f1', borderColor: '#e3d8d2' }}>
+    <form action={uploadPaymentReceipt} className="card" style={{ background: '#f4f4f4', borderColor: '#e0e0e0' }}>
       <input type="hidden" name="supplierId" value={supplierId} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0 }}>Registrar pago de varias facturas</h2>

@@ -5,6 +5,7 @@ import { db } from '../db';
 import { getSupplierByToken } from '../auth';
 import { audit } from '../audit';
 import { checkTyposquatting, holderMatchesRazonSocial, raiseRedFlag } from '../bec';
+import { parseInvoiceXml } from '../xml-invoice';
 import { validateBank, validateTaxId } from '../countries';
 import { encryptFile, MAX_FILE_MSG, MAX_FILE_SIZE } from '../files';
 
@@ -201,6 +202,21 @@ export async function createInvoice(formData: FormData) {
     const okType = /pdf|xml/.test(file.type) || /\.(pdf|xml)$/i.test(file.name);
     if (!okType) throw new Error('Solo se aceptan archivos PDF o XML');
 
+    const bytes = Buffer.from(await file.arrayBuffer());
+
+    // Si es XML, verificar que el CUIT/RUT del emisor coincida con el registrado
+    if (/\.xml$/i.test(file.name) || /xml/.test(file.type)) {
+      const parsed = parseInvoiceXml(bytes.toString('utf8'));
+      const supTax = (supplier.taxId ?? '').replace(/[^\d]/g, '');
+      if (parsed.taxId && supTax && parsed.taxId !== supTax) {
+        await raiseRedFlag(
+          supplier.id,
+          'CUIT_FACTURA',
+          `El Tax ID emisor del XML (${parsed.taxId}) no coincide con el del proveedor registrado (${supTax}) en la factura ${number}. Verificar antes de aprobar.`,
+        );
+      }
+    }
+
     const invoice = await db.invoice.create({
       data: {
         supplierId: supplier.id,
@@ -218,7 +234,7 @@ export async function createInvoice(formData: FormData) {
         invoiceId: invoice.id,
         type: 'FACTURA',
         filename: file.name,
-        data: encryptFile(Buffer.from(await file.arrayBuffer())),
+        data: encryptFile(bytes),
         mimeType: file.type || 'application/octet-stream',
         size: file.size,
         uploadedBy: 'proveedor',

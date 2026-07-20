@@ -6,14 +6,14 @@
   --muted: #6f7275;
   --primary: #333333;      /* Pantone 447 C */
   --primary-dark: #1f1f1f;
-  --accent: #7a6151;       /* Pantone 7531 C (marrón) */
-  --accent-dark: #634e41;
+  --accent: #4a4a4a;       /* gris medio-oscuro para acciones */
+  --accent-dark: #333333;
   --cool: #96999b;         /* Cool Gray 7 C */
   --light: #e8e8e8;        /* Pantone 663 C */
   --danger: #a13b3b;
   --danger-bg: #faf1f1;
-  --warn: #7a6151;
-  --warn-bg: #f7f3f1;
+  --warn: #6b5d34;
+  --warn-bg: #faf7ee;
   --ok: #3f6f4f;
   --ok-bg: #f0f6f2;
 }
@@ -54,7 +54,7 @@ a:hover { text-decoration: underline; }
 .topbar nav a.nav-active { background: rgba(255,255,255,0.14); color: #fff; font-weight: 600; }
 .topbar .user { font-size: 13px; color: #cfcfcf; display: flex; align-items: center; gap: 12px; }
 .topbar .user .role-chip {
-  background: #7a6151;
+  background: #6f7275;
   color: #fff;
   padding: 2px 8px;
   border-radius: 10px;
@@ -111,8 +111,8 @@ input, select, textarea {
   color: var(--text);
   min-width: 0;
 }
-input:focus, select:focus, textarea:focus { outline: 2px solid #c3b3ab; border-color: var(--accent); }
-button:focus-visible, a:focus-visible { outline: 2px solid #c3b3ab; outline-offset: 2px; border-radius: 4px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid #b8b8b8; border-color: var(--accent); }
+button:focus-visible, a:focus-visible { outline: 2px solid #b8b8b8; outline-offset: 2px; border-radius: 4px; }
 button:disabled { opacity: 0.6; cursor: wait; }
 button, .btn { transition: background 0.15s ease; }
 
@@ -172,7 +172,7 @@ button.small, .btn.small { padding: 5px 10px; font-size: 13px; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(160deg, #333333, #7a6151);
+  background: linear-gradient(160deg, #333333, #6f7275);
   padding: 16px;
 }
 .login-card {
@@ -212,11 +212,11 @@ button.small, .btn.small { padding: 5px 10px; font-size: 13px; }
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
 }
-.tabs .tab:hover { background: #f0eeec; text-decoration: none; }
+.tabs .tab:hover { background: #f0f0f0; text-decoration: none; }
 .tabs .tab.active {
   color: var(--accent-dark);
   border-bottom-color: var(--accent);
-  background: #f7f3f1;
+  background: #f0f0f0;
 }
 
 .portal-header {
@@ -266,12 +266,12 @@ button.small, .btn.small { padding: 5px 10px; font-size: 13px; }
 }
 
 /* Facturas: tarjeta con acciones directas */
-.invoice-card { border-left: 3px solid var(--accent); }
+.invoice-card { border-left: 3px solid var(--cool); }
 .invoice-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .invoice-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
 .inline-pay {
   display: flex; flex-direction: column; gap: 8px;
-  background: #f7f3f1; border: 1px solid #e3d8d2; border-radius: 8px; padding: 12px; width: 100%;
+  background: #f4f4f4; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; width: 100%;
 }
 .inline-pay-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .chk { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; color: var(--text); }
