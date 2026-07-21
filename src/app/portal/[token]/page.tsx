@@ -73,12 +73,21 @@ export default async function PortalPage({
   ]);
 
   const missingDocs = missingRequiredDocs(supplier.country, documents);
-  const pendiente = invoices.filter((i) => i.status !== 'PAGADA').reduce((a, i) => a + i.amount, 0);
-  const cobrado = invoices.filter((i) => i.status === 'PAGADA').reduce((a, i) => a + i.amount, 0);
   const invoiceCounts = invoices.reduce<Record<string, number>>((acc, i) => {
     acc[i.status] = (acc[i.status] ?? 0) + 1;
     return acc;
   }, {});
+  // Cuenta corriente del proveedor separada por moneda
+  const porMoneda = new Map<string, { pendiente: number; cobrado: number }>();
+  for (const i of invoices) {
+    const cur = i.currency || '—';
+    const row = porMoneda.get(cur) ?? { pendiente: 0, cobrado: 0 };
+    const signo = i.kind === 'NOTA_CREDITO' ? -1 : 1;
+    if (i.status === 'PAGADA') row.cobrado += signo * i.amount;
+    else row.pendiente += signo * i.amount;
+    porMoneda.set(cur, row);
+  }
+  const monedas = [...porMoneda.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   const estado = searchParams.estado;
   const invoicesFiltered = estado ? invoices.filter((i) => i.status === estado) : invoices;
   const currentIdx = FLOW.indexOf(supplier.status);
@@ -160,7 +169,7 @@ export default async function PortalPage({
               </div>
             )}
 
-            <div className="grid cols-4">
+            <div className="grid cols-2">
               <div className="card stat">
                 <div className="num">{invoices.length}</div>
                 <div className="label">Comprobantes cargados</div>
@@ -169,15 +178,31 @@ export default async function PortalPage({
                 <div className="num">{invoiceCounts['PAGADA'] ?? 0}</div>
                 <div className="label">Pagados</div>
               </div>
-              <div className="card stat">
-                <div className="num">{pendiente.toLocaleString('es-AR')}</div>
-                <div className="label">Pendiente de cobro</div>
-              </div>
-              <div className="card stat">
-                <div className="num">{cobrado.toLocaleString('es-AR')}</div>
-                <div className="label">Cobrado</div>
-              </div>
             </div>
+
+            {monedas.length > 0 && (
+              <div className="card">
+                <h2>Mi cuenta corriente por moneda</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Moneda</th>
+                      <th style={{ textAlign: 'right' }}>Pendiente de cobro</th>
+                      <th style={{ textAlign: 'right' }}>Cobrado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monedas.map(([cur, r]) => (
+                      <tr key={cur}>
+                        <td><strong>{cur}</strong></td>
+                        <td style={{ textAlign: 'right' }}>{r.pendiente.toLocaleString('es-AR')} {cur}</td>
+                        <td style={{ textAlign: 'right' }}>{r.cobrado.toLocaleString('es-AR')} {cur}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {invoices.length > 0 && (
               <div className="card">

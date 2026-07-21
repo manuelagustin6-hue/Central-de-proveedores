@@ -250,5 +250,26 @@ await admin.page.goto(`${BASE}/proveedores?page=2`);
 const pag2 = await admin.page.locator('.badge', { hasText: 'Página' }).first().innerText();
 check('Existe segunda página', /Página\s*2\s*de/.test(pag2));
 
+// 14. Cuenta corriente por moneda: el proveedor carga una factura en USD
+await pp.goto(`${BASE}/portal/${token}?tab=facturas`);
+await pp.fill('input[name=number]', '0001-00009999');
+await pp.fill('input[name=issueDate]', '2026-07-16');
+await pp.fill('input[name=amount]', '500');
+await pp.fill('input[name=currency]', 'USD');
+await pp.setInputFiles('input[name=file][accept]', {
+  name: 'factura-usd.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 usd'),
+});
+await act(pp, 'text=Enviar comprobante');
+await pp.goto(`${BASE}/portal/${token}?tab=inicio`);
+const ccPortal = await pp.content();
+check('Cuenta corriente del proveedor separa monedas (ARS y USD)',
+  ccPortal.includes('Mi cuenta corriente por moneda') && /500\D*USD/.test(ccPortal) && ccPortal.includes('ARS'));
+
+// Vista interna: la cuenta corriente del proveedor también separa por moneda
+await tes.page.goto(`${supplierUrl}/facturas`);
+const ccInterna = await tes.page.content();
+check('Vista interna: cuenta corriente por moneda',
+  ccInterna.includes('Cuenta corriente por moneda') && ccInterna.includes('USD') && ccInterna.includes('ARS'));
+
 await browser.close();
 console.log(results.join('\n'));

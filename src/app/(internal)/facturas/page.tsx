@@ -21,7 +21,9 @@ export default async function InvoicesOverviewPage({
   const pagadas = countBy('PAGADA');
   const porPagar = countBy('APROBADA_PARA_PAGO') + countBy('PROGRAMADA');
   const enCircuito = grouped.filter((g) => g.status !== 'PAGADA').reduce((a, g) => a + g._count._all, 0);
-  const pendienteAgg = await db.invoice.aggregate({
+  // Monto pendiente separado por moneda (no se suman ARS + USD)
+  const pendientePorMoneda = await db.invoice.groupBy({
+    by: ['currency'],
     _sum: { amount: true },
     where: { status: { not: 'PAGADA' } },
   });
@@ -60,8 +62,14 @@ export default async function InvoicesOverviewPage({
           <div className="label">Pagadas</div>
         </div>
         <div className="card stat">
-          <div className="num">{(pendienteAgg._sum.amount ?? 0).toLocaleString('es-AR')}</div>
-          <div className="label">Monto pendiente (todas las monedas)</div>
+          <div className="num" style={{ fontSize: 20 }}>
+            {pendientePorMoneda.length === 0
+              ? '—'
+              : pendientePorMoneda
+                  .map((p) => `${(p._sum.amount ?? 0).toLocaleString('es-AR')} ${p.currency}`)
+                  .join(' · ')}
+          </div>
+          <div className="label">Pendiente de pago por moneda</div>
         </div>
       </div>
 

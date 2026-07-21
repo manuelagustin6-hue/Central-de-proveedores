@@ -43,9 +43,21 @@ export default async function SupplierInvoicesPage({
     acc[i.status] = (acc[i.status] ?? 0) + 1;
     return acc;
   }, {});
-  const pendiente = supplier.invoices.filter((i) => i.status !== 'PAGADA').reduce((a, i) => a + i.amount, 0);
-  const pagado = supplier.invoices.filter((i) => i.status === 'PAGADA').reduce((a, i) => a + i.amount, 0);
   const base = `/proveedores/${supplier.id}/facturas`;
+
+  // Cuenta corriente separada por moneda (no se pueden sumar ARS + USD, etc.)
+  const porMoneda = new Map<string, { pendiente: number; pagado: number; total: number }>();
+  for (const i of supplier.invoices) {
+    const cur = i.currency || '—';
+    const row = porMoneda.get(cur) ?? { pendiente: 0, pagado: 0, total: 0 };
+    // Las notas de crédito restan del saldo de la cuenta corriente
+    const signo = i.kind === 'NOTA_CREDITO' ? -1 : 1;
+    row.total += signo * i.amount;
+    if (i.status === 'PAGADA') row.pagado += signo * i.amount;
+    else row.pendiente += signo * i.amount;
+    porMoneda.set(cur, row);
+  }
+  const monedas = [...porMoneda.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
   // Facturas que Tesorería puede pagar en lote (aprobadas/programadas)
   const pagables = supplier.invoices.filter((i) => ['APROBADA_PARA_PAGO', 'PROGRAMADA'].includes(i.status));
@@ -63,7 +75,7 @@ export default async function SupplierInvoicesPage({
       <p className="muted">{countryName(supplier.country)}</p>
       <Flash searchParams={searchParams} />
 
-      <div className="grid cols-4">
+      <div className="grid cols-2">
         <div className="card stat">
           <div className="num">{supplier.invoices.length}</div>
           <div className="label">Comprobantes</div>
@@ -72,14 +84,37 @@ export default async function SupplierInvoicesPage({
           <div className="num">{counts['PAGADA'] ?? 0}</div>
           <div className="label">Pagadas</div>
         </div>
-        <div className="card stat">
-          <div className="num">{pendiente.toLocaleString('es-AR')}</div>
-          <div className="label">Pendiente de pago</div>
-        </div>
-        <div className="card stat">
-          <div className="num">{pagado.toLocaleString('es-AR')}</div>
-          <div className="label">Pagado</div>
-        </div>
+      </div>
+
+      <div className="card">
+        <h2>Cuenta corriente por moneda</h2>
+        {monedas.length === 0 ? (
+          <p className="muted">Sin comprobantes cargados.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Moneda</th>
+                <th style={{ textAlign: 'right' }}>Pendiente de pago</th>
+                <th style={{ textAlign: 'right' }}>Pagado</th>
+                <th style={{ textAlign: 'right' }}>Total facturado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monedas.map(([cur, r]) => (
+                <tr key={cur}>
+                  <td><strong>{cur}</strong></td>
+                  <td style={{ textAlign: 'right', color: r.pendiente > 0 ? 'var(--danger)' : undefined }}>
+                    {r.pendiente.toLocaleString('es-AR')} {cur}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{r.pagado.toLocaleString('es-AR')} {cur}</td>
+                  <td style={{ textAlign: 'right' }}>{r.total.toLocaleString('es-AR')} {cur}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="muted">Las notas de crédito se restan del saldo. Cada moneda se totaliza por separado.</p>
       </div>
 
       {can('PAGOS') && pagables.length > 0 && (
