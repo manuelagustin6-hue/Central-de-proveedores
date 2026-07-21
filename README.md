@@ -75,6 +75,29 @@ Usuarios demo (contraseña `demo1234`):
 
 La contraseña inicial se define con `SEED_PASSWORD` (los usuarios se crean solo si la tabla está vacía). Con `SEED_DEMO=1` el seed además crea tres proveedores de ejemplo, uno por país; el enlace de portal de cada proveedor se ve en su ficha interna.
 
+## Escala (miles de proveedores)
+
+El sistema está preparado para una base grande de proveedores y comprobantes:
+
+- **Índices de base de datos** en las columnas más consultadas (estado, país,
+  Tax ID, razón social y fechas de proveedores; estado y proveedor de facturas;
+  proveedor/acción/fecha del registro de auditoría). Las búsquedas y filtros
+  siguen siendo rápidos al crecer la tabla.
+- **Paginación por servidor** en las listas que crecen (proveedores, resumen de
+  facturas y registro de auditoría): se consultan de a 25–50 registros con
+  `COUNT` + `skip/take`, nunca la tabla entera en memoria. Los totales del
+  panel se calculan con agregaciones (`groupBy`/`aggregate`) en la base.
+- **Pooling de conexiones (recomendado en producción serverless)**: en Vercel +
+  Neon, usar la *connection string* con pooler (la que incluye `-pooler` en el
+  host, o el parámetro `?pgbouncer=true`). La integración Neon de Vercel ya
+  provee `DATABASE_URL` apuntando al pooler; conviene mantener esa.
+- **Almacenamiento de documentos**: hoy los archivos se guardan encriptados
+  dentro de PostgreSQL, lo que simplifica el despliegue. Con un volumen muy
+  alto de PDFs/XML conviene mover el contenido a almacenamiento de objetos
+  (S3 / Google Cloud Storage / Azure Blob) y dejar en la base solo la
+  referencia; la capa de acceso (`src/lib/files.ts` + `/api/files/[id]`) está
+  aislada para hacer ese cambio sin tocar el resto del sistema.
+
 ## Prueba end-to-end
 
 Con el servidor corriendo sobre una base recién sembrada:

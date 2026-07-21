@@ -54,6 +54,12 @@ model Supplier {
   redFlags     RedFlag[]
   transfers    TestTransfer[]
   auditLogs    AuditLog[]
+
+  @@index([status])
+  @@index([country])
+  @@index([taxId])
+  @@index([razonSocial])
+  @@index([createdAt])
 }
 
 // Datos bancarios con campos específicos por país
@@ -116,6 +122,9 @@ model Document {
   supplier     Supplier          @relation(fields: [supplierId], references: [id])
   invoice      Invoice?          @relation(fields: [invoiceId], references: [id])
   invoiceLinks DocumentInvoice[]
+
+  @@index([supplierId])
+  @@index([invoiceId])
 }
 
 // Un comprobante de pago/retención puede cubrir varias facturas
@@ -147,6 +156,10 @@ model Invoice {
   documents     Document[]
   documentLinks DocumentInvoice[]
   approvals     InvoiceApproval[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 // Doble aprobación: aprobaciones individuales sobre una factura
@@ -190,6 +203,9 @@ model RedFlag {
   createdAt  DateTime @default(now())
 
   supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId, resolved])
+  @@index([resolved])
 }
 
 // Trazabilidad imborrable: quién, qué, cuándo y desde qué IP.
@@ -208,4 +224,8 @@ model AuditLog {
 
   user     User?     @relation(fields: [userId], references: [id])
   supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId, createdAt])
+  @@index([action])
+  @@index([createdAt])
 }

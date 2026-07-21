@@ -2,30 +2,39 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { getRolePerms } from '@/lib/permissions';
+import { Pagination } from '@/components/Pagination';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AuditPage({ searchParams }: { searchParams: { q?: string } }) {
+const PAGE_SIZE = 50;
+
+export default async function AuditPage({ searchParams }: { searchParams: { q?: string; page?: string } }) {
   const session = getSession();
   if (!session) redirect('/login');
   const perms = await getRolePerms(session.role);
   if (!perms.has('VER_AUDITORIA')) redirect('/dashboard');
 
   const q = searchParams.q?.trim();
-  const logs = await db.auditLog.findMany({
-    where: q
-      ? {
-          OR: [
-            { action: { contains: q } },
-            { actorLabel: { contains: q } },
-            { detail: { contains: q } },
-          ],
-        }
-      : undefined,
-    orderBy: { createdAt: 'desc' },
-    take: 200,
-    include: { supplier: { select: { razonSocial: true } } },
-  });
+  const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1);
+  const where = q
+    ? {
+        OR: [
+          { action: { contains: q } },
+          { actorLabel: { contains: q } },
+          { detail: { contains: q } },
+        ],
+      }
+    : {};
+  const [total, logs] = await Promise.all([
+    db.auditLog.count({ where }),
+    db.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: { supplier: { select: { razonSocial: true } } },
+    }),
+  ]);
 
   return (
     <>
@@ -56,6 +65,7 @@ export default async function AuditPage({ searchParams }: { searchParams: { q?: 
             ))}
           </tbody>
         </table>
+        <Pagination basePath="/auditoria" params={{ q }} page={page} pageSize={PAGE_SIZE} total={total} />
       </div>
     </>
   );

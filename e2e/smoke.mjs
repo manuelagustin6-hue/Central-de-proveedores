@@ -233,5 +233,22 @@ await np.click('button[type=submit]');
 await np.waitForURL('**/dashboard');
 check('El usuario nuevo puede ingresar', np.url().includes('/dashboard'));
 
+// 13. Paginación de proveedores: crear 30 y verificar que pagina (page size 25)
+for (let i = 0; i < 30; i++) {
+  await admin.page.goto(`${BASE}/proveedores/nuevo`);
+  await admin.page.selectOption('select[name=country]', 'AR');
+  await admin.page.fill('input[name=razonSocial]', `Proveedor Masivo ${i}`);
+  await admin.page.click('text=Crear y generar enlace');
+  await admin.page.waitForURL(/\/proveedores\/(?!nuevo)[a-z0-9]+/);
+}
+await admin.page.goto(`${BASE}/proveedores`);
+const pag1 = await admin.page.locator('.badge', { hasText: 'Página' }).first().innerText();
+check('Lista de proveedores pagina (página 1)', /Página\s*1\s*de/.test(pag1));
+const filasP1 = await admin.page.locator('tbody tr').count();
+check('Primera página acotada a 25 filas', filasP1 === 25);
+await admin.page.goto(`${BASE}/proveedores?page=2`);
+const pag2 = await admin.page.locator('.badge', { hasText: 'Página' }).first().innerText();
+check('Existe segunda página', /Página\s*2\s*de/.test(pag2));
+
 await browser.close();
 console.log(results.join('\n'));
